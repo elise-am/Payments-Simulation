@@ -1588,7 +1588,7 @@ function renderUnavailable(){
 }
 /* Goal view: today's real counts and amounts multiplied by GOAL_X to show the daily goal
    (pace of 4,000 work orders a month). Cards are labeled as the goal; Today shows the real numbers. */
-const GOAL_X=2;
+const GOAL_X=5;
 let goalOn=true;try{goalOn=localStorage.getItem('goalView')!=='actual';}catch{}
 function renderGoalbar(){
   const g=$('#goalbar');g.hidden=MODE!=='real';if(g.hidden)return;
