@@ -533,6 +533,7 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
       </div>
     </div>
     <label class="fgroup" for="f-trade">Trade <select class="sel" id="f-trade"></select></label>
+    <label class="fgroup" for="f-region">Region <select class="sel" id="f-region"></select></label>
     <label class="fgroup" for="f-state">State <select class="sel" id="f-state"></select></label>
     <span class="fnote" id="f-note"></span>
   </div>
@@ -744,6 +745,10 @@ const CLIENTS=[
 const CITIES=['Dallas, TX','Houston, TX','San Antonio, TX','Phoenix, AZ','Denver, CO','Las Vegas, NV',
   'Atlanta, GA','Tampa, FL','Orlando, FL','Charlotte, NC','Nashville, TN','Columbus, OH'];
 const STATES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',DC:'District of Columbia',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming'};
+// US Census Bureau regions
+const REGIONS={Northeast:'CT ME MA NH RI VT NJ NY PA',Midwest:'IL IN MI OH WI IA KS MN MO NE ND SD',
+  South:'DE DC FL GA MD NC SC VA WV AL KY MS TN AR LA OK TX',West:'AZ CO ID MT NV NM UT WY AK CA HI OR WA'};
+const REGION_OF={};for(const[r,list]of Object.entries(REGIONS))for(const s of list.split(' '))REGION_OF[s]=r;
 const METHODS=[{name:'Instant bank transfer',w:71},{name:'Instant to debit card',w:29}];
 const REASONS=[{name:'Above quoted cost',w:30},{name:'First payment to payee',w:22},{name:'Receipt missing',w:18},{name:'Alternate recipient',w:12},{name:'Possible duplicate',w:7},{name:'Rate above vendor card',w:5}];
 const FLOOR='Margin below 25% floor';
@@ -1132,14 +1137,22 @@ $('#pause').addEventListener('click',()=>{paused=!paused;$('#pause').textContent
 $('#next').addEventListener('click',()=>{if(MODE==='real'){if(REAL?.jobs.length)pickReal((realSel+1)%REAL.jobs.length);return;}parts=[];newJourney();if(paused){paused=false;$('#pause').textContent='Pause';$('#story').classList.remove('is-paused');}});
 
 /* ══════════════════ ANALYTICS: shared filters ══════════════════ */
-const F={P:30,trade:'',state:''};
+const F={P:30,trade:'',region:'',state:''};
 function opts(el,label,list){el.innerHTML=`<option value="">${label}</option>`+list.map(x=>`<option>${esc(x)}</option>`).join('');}
 opts($('#f-trade'),'All trades',TRADES.map(t=>t.name));
-$('#f-state').innerHTML='<option value="">All states</option>'+[...new Set(CITIES.map(c=>c.slice(-2)))].sort((a,b)=>STATES[a].localeCompare(STATES[b])).map(s=>`<option value="${s}">${STATES[s]}</option>`).join('');
+opts($('#f-region'),'All regions',Object.keys(REGIONS));
+// State list follows the chosen region
+function stateOpts(){
+  const list=[...new Set(CITIES.map(c=>c.slice(-2)))].filter(s=>!F.region||REGION_OF[s]===F.region).sort((a,b)=>STATES[a].localeCompare(STATES[b]));
+  if(F.state&&!list.includes(F.state))F.state='';
+  $('#f-state').innerHTML='<option value="">All states</option>'+list.map(s=>`<option value="${s}">${STATES[s]}</option>`).join('');
+  $('#f-state').value=F.state;
+}
+stateOpts();
 
 
 let CTX=null;
-function woMatch(w){return (!F.trade||w.trade===F.trade)&&(!F.state||w.state===F.state);}
+function woMatch(w){return (!F.trade||w.trade===F.trade)&&(!F.region||REGION_OF[w.state]===F.region)&&(!F.state||w.state===F.state);}
 function ctx(){
   if(CTX)return CTX;
   const P=F.P,s=NDAY-P,ps=NDAY-2*P;
@@ -1155,7 +1168,7 @@ function ctx(){
   return CTX;
 }
 function rangeLabel(c){return `Last ${c.P} days · ${fmtD(c.s)} – ${fmtD(NDAY-1)}, 2026`;}
-function filterText(){const f=[F.trade,STATES[F.state]].filter(Boolean);return f.length?f.join(' · '):'All trades and states';}
+function filterText(){const f=[F.trade,F.state?STATES[F.state]:F.region].filter(Boolean);return f.length?f.join(' · '):'All trades and regions';}
 
 function delta(cur,prev,goodUp,mode){
   if(!isFinite(cur)||!isFinite(prev)||!prev)return '';
@@ -1449,6 +1462,7 @@ $('#subtabs').addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='A
 function setFilter(k,v){F[k]=v;CTX=null;L.open=null;L.show=40;renderView();}
 $('#f-period').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('#f-period button').forEach(x=>x.setAttribute('aria-pressed',x===b));setFilter('P',+b.dataset.p);});
 $('#f-trade').addEventListener('change',e=>setFilter('trade',e.target.value));
+$('#f-region').addEventListener('change',e=>{F.region=e.target.value;stateOpts();setFilter('region',F.region);});
 $('#f-state').addEventListener('change',e=>setFilter('state',e.target.value));
 
 const VIEWS=['live','analytics'];
@@ -1518,24 +1532,23 @@ $('#src').addEventListener('click',e=>{
   const b=e.target.closest('[data-m]');if(!b)return;
   const m=b.dataset.m==='real'?'real':'demo';if(m!==MODE)setMode(m);
 });
-/* Goal view: today's real counts and amounts multiplied by GOAL_X so the page shows the
-   pace of the 4,000-work-orders-a-month goal. Always labeled; Actual shows the real numbers. */
+/* Goal view: today's real counts and amounts multiplied by GOAL_X to show the daily goal
+   (pace of 4,000 work orders a month). Cards are labeled as the goal; Today shows the real numbers. */
 const GOAL_X=2;
 let goalOn=true;try{goalOn=localStorage.getItem('goalView')!=='actual';}catch{}
 function renderGoalbar(){
   const g=$('#goalbar');g.hidden=MODE!=='real';if(g.hidden)return;
-  g.innerHTML=`<span class="gl">${goalOn?`Shown at goal pace: today's numbers ×${GOAL_X}`:'Actual numbers from ClickUp'}</span>
-    <div class="seg" role="group" aria-label="Numbers"><button type="button" data-g="actual" aria-pressed="${!goalOn}">Actual</button><button type="button" data-g="goal" aria-pressed="${goalOn}">At goal ×${GOAL_X}</button></div>`;
+  g.innerHTML=`<span class="gl">${goalOn?'Daily goal':'Today so far, from ClickUp'}</span>
+    <div class="seg" role="group" aria-label="Numbers"><button type="button" data-g="actual" aria-pressed="${!goalOn}">Today</button><button type="button" data-g="goal" aria-pressed="${goalOn}">Goal</button></div>`;
 }
 $('#goalbar').addEventListener('click',e=>{const b=e.target.closest('[data-g]');if(!b)return;goalOn=b.dataset.g==='goal';try{localStorage.setItem('goalView',goalOn?'goal':'actual');}catch{}renderReal();});
 function realKpis(jobs){
   const x=goalOn?GOAL_X:1,withCost=jobs.filter(j=>j.cost!=null),cost=sum(withCost,j=>j.cost);
-  const note=v=>goalOn?`Actual ${v} · shown ×${GOAL_X}`:'';
-  return [['Work orders completed',fmtN(jobs.length*x),goalOn?note(fmtN(jobs.length)):''],
+  return [[goalOn?'Work orders per day':'Work orders completed',fmtN(jobs.length*x),goalOn?'Target for a full day':''],
     ['Jobs with technician paid','–',''],
     ['Payments released','–',''],
     ['Average technician cost',withCost.length?fmt$(cost/withCost.length):'–',withCost.length?`Per job · ${withCost.length} of ${jobs.length} jobs have a cost`:'No costs entered yet']]
-    .map(([l,v,s],n)=>`<div class="kpi${n===0?' hero':''}"><span class="lbl">${l}${goalOn&&n===0&&v!=='–'?' <span class="gx">×'+GOAL_X+'</span>':''}</span><span class="val num">${v}</span><span class="sub">${s}</span></div>`).join('');
+    .map(([l,v,s],n)=>`<div class="kpi${n===0?' hero':''}"><span class="lbl">${l}${goalOn&&n===0&&v!=='–'?' <span class="gx">Goal</span>':''}</span><span class="val num">${v}</span><span class="sub">${s}</span></div>`).join('');
 }
 function renderReal(){
   if(MODE!=='real'||!REAL)return;
