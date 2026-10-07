@@ -71,8 +71,6 @@ button:hover{filter:brightness(1.07)}
 button:active{transform:scale(.98)}
 button:focus-visible{outline:2px solid var(--accent-fill);outline-offset:2px}
 button[disabled]{opacity:.7;cursor:default}
-.foot{margin:16px 2px 0;font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:6px}
-.foot .dot{width:7px;height:7px;border-radius:50%;background:var(--good);flex:none}
 @media (prefers-reduced-motion: reduce){input,button{transition:none}}
 </style>
 </head>
@@ -93,7 +91,6 @@ button[disabled]{opacity:.7;cursor:default}
       <input id="password" name="password" type="password" autocomplete="current-password" required${!askUser || error ? " autofocus" : ""}></div>
     <button type="submit">Sign in</button>
   </form>
-  <p class="foot"><span class="dot" aria-hidden="true"></span>Access is limited to the Seamless team. Ask your admin for the password.</p>
 </main>
 <script>
 const f=document.querySelector('form'),b=f.querySelector('button');
