@@ -60,6 +60,8 @@ html,body{margin:0}
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 img{max-width:100%}
 [hidden]{display:none!important}
+.kpis.fill{display:flex;flex-wrap:wrap}
+.kpis.fill .kpi{flex:1 1 180px}
 .subtabs{display:flex;gap:4px;overflow-x:auto;margin-bottom:16px;border-bottom:1px solid var(--border);scrollbar-width:thin}
 .subtab{appearance:none;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--ink-2);font:600 13.5px var(--font-body);padding:9px 12px 10px;margin-bottom:-1px;cursor:pointer;white-space:nowrap}
 .subtab:hover{color:var(--ink)}
@@ -612,7 +614,7 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
       <p class="sub-h">Speed</p>
       <div class="kpis" id="p-kpis"></div>
       <p class="sub-h">Volume</p>
-      <div class="kpis" id="b-kpis"></div>
+      <div class="kpis fill" id="b-kpis"></div>
       <div class="panel">
         <div class="panel-h"><h2>How long technicians waited, over time</h2><span class="meta" id="sla-meta"></span></div>
         <div class="chart" id="c-sla"></div>
@@ -1229,7 +1231,6 @@ function renderOverview(){
     kpi('Longest wait',hUnit(slowest?slowest.ctp:NaN),slowest?`${slowest.wo.id} · ${slowest.wo.tech}`:'–',slowest&&slowest.ctp>2?'warn':'')
   ].join('');
   $('#b-kpis').innerHTML=[
-    kpi('Paid to technicians',fmtK(S.total),`${delta(S.total,Sp.total,true)} ${vs}`),
     kpi('Payments released',fmtN(S.count),`${delta(S.count,Sp.count,true)} ≈ ${fmtN(S.count*mo)} / month`),
     kpi('Technicians paid',fmtN(S.techs),`${delta(S.techs,Sp.techs,true)} ${vs}`),
     kpi('Average payment',fmt$(S.total/Math.max(1,S.count)),`${fmt$(S.total/Math.max(1,S.techs))} per technician`),
