@@ -136,6 +136,22 @@ async function doneAt(task) {
   return ms;
 }
 
+/**
+ * Descriptions sometimes hold pasted payment requests ("PP:/PPR: name / phone / ACH / Rout: …").
+ * Drop those lines and any account, routing, card or phone numbers before the text is shown
+ * or sent anywhere, so bank details can never reach the page or the AI.
+ */
+function safeDescription(text) {
+  return String(text ?? "")
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*(pp|ppr)\s*:/i.test(line) && !/\b(rout|routing|acct|account|aba|iban|swift|card)\b/i.test(line))
+    .join("\n")
+    .replace(/\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/g, "") // phone numbers
+    .replace(/\d[\d\s-]{5,}\d/g, "") // long digit runs (accounts, routing, cards)
+    .replace(/[ \t]+/g, " ")
+    .trim();
+}
+
 function firstSentence(text) {
   const t = String(text ?? "").replace(/\s+/g, " ").trim();
   if (!t) return "";
@@ -208,7 +224,7 @@ async function build() {
   const today = withTimes.filter(([, ms]) => ms >= since);
 
   // Titles: cached per description; new ones go to Claude in one batch.
-  const descOf = (t) => String(t.text_content ?? t.description ?? "").trim().slice(0, 6000); // titles only need the opening of long descriptions
+  const descOf = (t) => safeDescription(t.text_content ?? t.description ?? "").slice(0, 6000); // titles only need the opening of long descriptions
   const keyOf = (t) => t.id + ":" + hash(descOf(t));
   const missing = today.filter(([t]) => !titleCache.has(keyOf(t)) && descOf(t)).map(([t]) => ({ id: t.id, description: descOf(t) }));
   const fresh = await aiTitles(missing);
@@ -226,7 +242,7 @@ async function build() {
       return {
         id: t.id,
         wo: t.name,
-        title: titleCache.get(k) || firstSentence(descOf(t)) || t.name,
+        title: titleCache.get(k) || firstSentence(descOf(t)) || (fieldText(field(t, names.trade)) ? fieldText(field(t, names.trade)) + " job" : "Work order"),
         titleFromAi: titleCache.has(k),
         trade: fieldText(field(t, names.trade)),
         fm: fieldText(field(t, names.fm)),

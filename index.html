@@ -87,6 +87,9 @@ svg.i{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .src{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
 .src .upd{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
 .btn:disabled{opacity:.5;cursor:default}
+.goalbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;margin-bottom:8px}
+.goalbar .gl{font-size:12px;font-weight:600;color:var(--accent);letter-spacing:.02em}
+.kpi .lbl .gx{display:inline-block;margin-left:4px;padding:0 5px;border-radius:3px;background:var(--accent-soft);color:var(--accent);letter-spacing:0}
 .notice{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;padding:8px 12px;border-radius:var(--radius);background:var(--warn-soft);color:var(--warn);font-size:12.5px;font-weight:600}
 .notice div{display:flex;align-items:center;gap:8px}
 .notice svg.i{width:16px;height:16px}
@@ -533,6 +536,7 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
 
   <!-- ═══════════════ LIVE ═══════════════ -->
   <section id="view-live" role="tabpanel" aria-labelledby="tab-live">
+    <div class="goalbar" id="goalbar" hidden></div>
     <div class="kpis sm" id="today"></div>
 
     <div class="notice" id="notice" role="status" hidden></div>
@@ -1466,6 +1470,7 @@ async function loadReal(force){
   try{
     const r=await fetch('/api/live'+(force?'?refresh=1':''),{cache:'no-store'});
     const j=await r.json().catch(()=>null);
+    if(j?.reason==='signed_out'){location.href='/login?next='+encodeURIComponent(location.pathname+location.search);return;}
     if(j&&j.ok){
       const keep=REAL?.jobs[realSel]?.id;REAL=j;
       const i=keep?j.jobs.findIndex(x=>x.id===keep):-1;realSel=i>=0?i:0;
@@ -1486,7 +1491,7 @@ function setMode(m){
     $('#flows-h').innerHTML='<h2>Also on the way</h2><span class="meta">Other payments moving through the same steps</span>';
     $('#wall-h').innerHTML='<h2>Just paid</h2><span class="meta">Newest first</span>';
     if(simWall)$('#wall').innerHTML=simWall;
-    $('#notice').hidden=true;
+    $('#notice').hidden=true;$('#goalbar').hidden=true;
     renderFlows(-1);renderToday();parts=[];newJourney();
   }
   setSrc();
@@ -1507,18 +1512,29 @@ $('#src').addEventListener('click',e=>{
   const b=e.target.closest('[data-m]');if(!b)return;
   const m=b.dataset.m==='real'?'real':'demo';if(m!==MODE)setMode(m);
 });
+/* Goal view: today's real counts and amounts multiplied by GOAL_X so the page shows the
+   pace of the 4,000-work-orders-a-month goal. Always labeled; Actual shows the real numbers. */
+const GOAL_X=2;
+let goalOn=true;try{goalOn=localStorage.getItem('goalView')!=='actual';}catch{}
+function renderGoalbar(){
+  const g=$('#goalbar');g.hidden=MODE!=='real';if(g.hidden)return;
+  g.innerHTML=`<span class="gl">${goalOn?`Shown at goal pace: today's numbers ×${GOAL_X}`:'Actual numbers from ClickUp'}</span>
+    <div class="seg" role="group" aria-label="Numbers"><button type="button" data-g="actual" aria-pressed="${!goalOn}">Actual</button><button type="button" data-g="goal" aria-pressed="${goalOn}">At goal ×${GOAL_X}</button></div>`;
+}
+$('#goalbar').addEventListener('click',e=>{const b=e.target.closest('[data-g]');if(!b)return;goalOn=b.dataset.g==='goal';try{localStorage.setItem('goalView',goalOn?'goal':'actual');}catch{}renderReal();});
 function realKpis(jobs){
-  const withCost=jobs.filter(j=>j.cost!=null);
-  return [['Work orders completed',fmtN(jobs.length),'Moved to Done/Incurred today'],
+  const x=goalOn?GOAL_X:1,withCost=jobs.filter(j=>j.cost!=null),cost=sum(withCost,j=>j.cost);
+  const note=v=>goalOn?`Actual ${v} · shown ×${GOAL_X}`:'';
+  return [['Work orders completed',fmtN(jobs.length*x),goalOn?note(fmtN(jobs.length)):'Moved to Done/Incurred today'],
     ['Jobs with technician paid','–','Fills in from Teams payment messages'],
     ['Payments released','–','Fills in from Teams payment messages'],
-    ['Technician cost today',withCost.length?fmtK(sum(withCost,j=>j.cost)):'–',`${withCost.length} of ${jobs.length} jobs have a cost`]]
-    .map(([l,v,s],n)=>`<div class="kpi${n===0?' hero':''}"><span class="lbl">${l}</span><span class="val num">${v}</span><span class="sub">${s}</span></div>`).join('');
+    ['Technician cost today',withCost.length?fmtK(cost*x):'–',goalOn&&withCost.length?note(fmtK(cost)):`${withCost.length} of ${jobs.length} jobs have a cost`]]
+    .map(([l,v,s],n)=>`<div class="kpi${n===0?' hero':''}"><span class="lbl">${l}${goalOn&&v!=='–'?' <span class="gx">×'+GOAL_X+'</span>':''}</span><span class="val num">${v}</span><span class="sub">${s}</span></div>`).join('');
 }
 function renderReal(){
   if(MODE!=='real'||!REAL)return;
   const jobs=REAL.jobs,j=jobs[realSel];
-  $('#today').innerHTML=realKpis(jobs);
+  renderGoalbar();$('#today').innerHTML=realKpis(jobs);
   const warn=REAL.warnings||[];
   $('#notice').hidden=!warn.length;$('#notice').innerHTML=warn.map(w=>`<div>${ic('alert')}${esc(w)}</div>`).join('');
   buildJourney();
