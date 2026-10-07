@@ -558,15 +558,6 @@ body[data-view="analytics"] .bar>.src{display:none}
   <section id="view-live" role="tabpanel" aria-labelledby="tab-live">
     <div class="goalbar" id="goalbar"></div>
     <div class="kpis sm" id="today"></div>
-    <div class="panel" id="lv-od">
-      <div class="panel-h od-h"><h2>Overdue payments <span class="od-n" id="lv-od-n">–</span></h2>
-        <div class="fgroup">Overdue after
-          <div class="seg" id="lv-od-t" role="group" aria-label="Overdue after"></div>
-        </div>
-      </div>
-      <div class="od-sum" id="lv-od-sum" hidden></div>
-      <div class="tbl-wrap"><table id="lv-od-table"></table></div>
-    </div>
 
     <div class="notice" id="notice" role="status" hidden></div>
     <div class="story" id="story">
@@ -666,7 +657,7 @@ body[data-view="analytics"] .bar>.src{display:none}
 
     <!-- speed history and breakdowns: simulated until real payments are saved day by day -->
     <h2 class="sec-h">Speed history and breakdowns</h2>
-    <div class="panel hist-real" id="hist-real" hidden><p class="empty">Real data covers today only so far. Speed over 7, 30 and 90 days, and by state, trade, payment type and technician, fills in once real payments are saved day by day. Switch to <b>Demo</b> to see these dashboards with simulated data.</p></div>
+    <div class="panel hist-real" id="hist-real" hidden><p class="empty">Real data covers today only so far. Speed over 7, 30 and 90 days, review times, and speed by state, trade, payment type and technician fills in once real payments are saved day by day. Switch to <b>Demo</b> to see these dashboards with simulated data.</p></div>
     <div id="hist-demo" hidden>
       <div class="a-head">
         <div>
@@ -725,17 +716,23 @@ body[data-view="analytics"] .bar>.src{display:none}
         <div class="panel-h"><h2>Longest waits</h2><span class="meta">Slowest payments in the period</span></div>
         <div class="tbl-wrap"><table id="slow"></table></div>
       </div>
-    </div>
-
       <div class="grid2 even">
         <div class="panel">
-          <div class="panel-h"><h2>By trade</h2><span class="meta">Payments, median wait and share within the hour</span></div>
-          <div class="tbl-wrap"><table id="trades"></table></div>
+          <div class="panel-h"><h2>Human review</h2><span class="meta">Payments held before release, and how fast they are decided</span></div>
+          <div class="pd" id="review"></div>
         </div>
         <div class="panel">
-          <div class="panel-h"><h2>Technicians waiting longest</h2><span class="meta">Highest median wait, technicians with 3+ payments</span></div>
-          <div class="tbl-wrap"><table id="techs-slow"></table></div>
+          <div class="panel-h"><h2>By trade</h2><span class="meta">Payments released, held and paid within the hour</span></div>
+          <div class="tbl-wrap"><table id="trades"></table></div>
         </div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h2>Top technicians</h2><span class="meta">By amount paid in the period, with how fast each was paid</span></div>
+        <div class="tbl-wrap"><table id="techs"></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h2>Technicians waiting longest</h2><span class="meta">Highest median wait, technicians with 3+ payments</span></div>
+        <div class="tbl-wrap"><table id="techs-slow"></table></div>
       </div>
     </div>
   </section>
@@ -1204,7 +1201,7 @@ async function loadPS(force){
   }catch(e){console.error('Pay speed:',e);psErr='Pay speed data unreachable';}
   psBusy=false;psNextAt=Date.now()+PS_MS;if(MODE==='real')renderPS();
 }
-// scoped: Analytics applies its trade / region / state filters; Live's overdue panel shows everything
+// scoped: Analytics applies its trade / region / state filters
 function psData(scoped){
   const D=MODE==='real'?PS:demoPS();
   if(!D||!scoped||!(F.trade||F.region||F.state))return D;
@@ -1263,11 +1260,10 @@ function psUpd(){const secs=Math.max(0,Math.ceil((psNextAt-Date.now())/1000));re
 function psStatus(){if(MODE!=='real'){$('#ps-status').innerHTML='<span class="sim-chip" title="Modeled data for demonstration">Simulated data</span>';return;}$('#ps-status').innerHTML=`<span class="upd">${psUpd()}</span><button type="button" class="btn" id="ps-refresh"${psBusy?' disabled':''}>Refresh</button>`;}
 $('#ps-status').addEventListener('click',e=>{if(e.target.closest('#ps-refresh'))loadPS(true);});
 setInterval(()=>{
-  if(document.hidden||psBusy)return;
+  if(view!=='analytics'||document.hidden||psBusy)return;
   if(MODE!=='real'){if(Date.now()%30000<1000)renderPS();return;} // demo jobs move along as the day goes on
-  if(view!=='analytics'&&!psNextAt){loadPS(false);return;} // first read for Live's overdue panel
   if(Date.now()>=psNextAt)loadPS(false);
-  else{const u=view==='analytics'&&$('#ps-status .upd');if(u)u.textContent=psUpd();if(psData()&&Date.now()%30000<1000)psOverdue();}
+  else{const u=$('#ps-status .upd');if(u)u.textContent=psUpd();if(psData()&&Date.now()%30000<1000)psOverdue();}
 },1000);
 
 function renderPS(){
@@ -1278,7 +1274,7 @@ function renderPS(){
   if(!D){
     $('#ps-range').textContent='Today · SFM';
     $('#ps-headline').textContent=MODE==='real'&&psErr?'Real pay speed is not available right now.':'Loading today\'s payments…';
-    ['#ps-pipe','#ps-kpis','#ps-gantt','#ps-table','#ps-chips'].forEach(s=>$(s).innerHTML='');['ps-od','lv-od'].forEach(P=>{$(`#${P}-table`).innerHTML='';$(`#${P}-n`).textContent='–';$(`#${P}-n`).classList.remove('on');$(`#${P}-sum`).hidden=true;});psOverdue();$('#ps-count').textContent='';
+    ['#ps-pipe','#ps-kpis','#ps-gantt','#ps-table','#ps-chips'].forEach(s=>$(s).innerHTML='');['ps-od'].forEach(P=>{$(`#${P}-table`).innerHTML='';$(`#${P}-n`).textContent='–';$(`#${P}-n`).classList.remove('on');$(`#${P}-sum`).hidden=true;});psOverdue();$('#ps-count').textContent='';
     return;
   }
   const S=D.summary,now=D.asOf,T=S.completeToPaid,Q=S.requestToPaid,teams=D.teamsConnected;
@@ -1321,9 +1317,9 @@ function renderPS(){
    between refreshes. */
 const OD_T=[[30,'30 min'],[60,'1 h'],[120,'2 h']];
 let odMin=60;try{const v=+localStorage.getItem('overdueMin');if(OD_T.some(t=>t[0]===v))odMin=v;}catch{}
-function psOverdue(){odRender('ps-od');odRender('lv-od');}
+function psOverdue(){odRender('ps-od');}
 function odRender(P){
-  const D=psData(P==='ps-od');
+  const D=psData(true);
   $(`#${P}-t`).innerHTML=OD_T.map(([v,n])=>`<button type="button" data-t="${v}" aria-pressed="${v===odMin}">${n}</button>`).join('');
   if(!D)return;
   const now=Date.now(),T=odMin*60000,teams=D.teamsConnected;
@@ -1349,7 +1345,7 @@ function odRender(P){
       <td class="r"><span class="wait ${late?'late':'slow'}">${dur(r.age)}</span></td><td class="r"><span class="pill ${late?'r':'w'}">+${dur(r.age-T)}</span></td></tr>`;
   }).join('')+'</tbody>';
 }
-['#ps-od-t','#lv-od-t'].forEach(id=>$(id).addEventListener('click',e=>{const b=e.target.closest('[data-t]');if(!b)return;odMin=+b.dataset.t;try{localStorage.setItem('overdueMin',odMin);}catch{}psOverdue();}));
+$('#ps-od-t').addEventListener('click',e=>{const b=e.target.closest('[data-t]');if(!b)return;odMin=+b.dataset.t;try{localStorage.setItem('overdueMin',odMin);}catch{}psOverdue();});
 
 // one row per job: completed → request (blue), request → 👍 (green), still waiting (amber, faded)
 function psGantt(el,rows,now,since){
@@ -1630,18 +1626,37 @@ function renderSpeedHistory(){
   ].join('');
   $('#sla-meta').textContent=(c.size===1?'Per day':'Per week')+' · share of payments by wait';
   slaChart($('#c-sla'));
+  // review panel
+  const flagged=c.pCur.filter(p=>p.flagged),FL=Math.max(1,flagged.length);
+  const out={approved:0,adjusted:0,rejected:0};flagged.forEach(p=>out[p.outcome]++);
+  const saved=sum(flagged,p=>p.amount-p.paidAmount);
+  const rc={};flagged.forEach(p=>p.reasons.forEach(x=>rc[x]=(rc[x]||0)+1));
+  const rs=Object.entries(rc).sort((a,b)=>b[1]-a[1]);const rmax=rs.length?rs[0][1]:1;
+  $('#review').innerHTML=`<div class="big3">
+      <div><span class="v">${(flagged.length/Math.max(1,c.pCur.length)*100).toFixed(1)}%</span><span class="l">of payments held</span></div>
+      <div><span class="v">${fmtH(median(flagged.map(p=>p.review)))}</span><span class="l">median time to decide</span></div>
+      <div><span class="v">${fmtN(flagged.length)}</span><span class="l">reviews completed</span></div></div>
+    <div class="saved"><span class="v">${fmtK(saved)}</span><span>in overbilling and duplicates stopped before payout</span></div>
+    <p class="sub-h">Outcome</p>
+    <div class="hbars">${[['Approved as submitted',out.approved,'g'],['Corrected, then paid',out.adjusted,'a'],['Stopped',out.rejected,'r']].map(([n,v,cl])=>
+      `<div class="hb"><span class="name">${n}</span><span class="t"><div class="${cl}" style="width:${v/FL*100}%"></div></span><span class="pct">${Math.round(v/FL*100)}%</span></div>`).join('')}</div>
+    <p class="sub-h">Why payments were held</p>
+    <div class="hbars">${rs.map(([n,v])=>`<div class="hb"><span class="name">${n}</span><span class="t"><div style="width:${v/rmax*100}%"></div></span><span class="pct">${fmtN(v)}</span></div>`).join('')}</div>`;
+
   // by trade
   const tr=TRADES.map(T=>{const rows=S.paid.filter(p=>p.wo.trade===T.name);return {n:T.name,c:rows.length,s:sum(rows,p=>p.paidAmount),m:median(rows.map(p=>p.ctp)),w:rows.filter(p=>p.ctp<=1).length/Math.max(1,rows.length),h:rows.filter(p=>p.flagged).length/Math.max(1,rows.length)};}).filter(x=>x.c).sort((a,b)=>b.c-a.c);
   $('#trades').innerHTML=`<thead><tr><th>Trade</th><th class="r">Payments</th><th class="r">Paid out</th><th class="r">Median</th><th class="r">Held</th><th class="r">Within 1 h</th></tr></thead><tbody>`+
     tr.map(x=>`<tr><td>${x.n}</td><td class="r">${fmtN(x.c)}</td><td class="r">${fmtK(x.s)}</td><td class="r">${fmtH(x.m)}</td><td class="r">${fmtP(x.h)}</td><td class="r">${(x.w*100).toFixed(1)}%<span class="mini"><i style="width:${x.w*100}%"></i></span></td></tr>`).join('')+'</tbody>';
 
-  // technicians waiting longest
+  // top technicians and technicians waiting longest
   const tm=new Map();S.paid.forEach(p=>{let t=tm.get(p.wo.techId);if(!t){t={id:p.wo.techId,name:p.wo.tech,wos:new Set(),paid:0,held:0,ctp:[],trades:{}};tm.set(p.wo.techId,t);}t.wos.add(p.wo);t.paid+=p.paidAmount;t.ctp.push(p.ctp);if(p.flagged)t.held++;t.trades[p.wo.trade]=(t.trades[p.wo.trade]||0)+1;});
   tm.forEach(t=>{t.med=median(t.ctp);t.max=Math.max(...t.ctp);t.in1=t.ctp.filter(x=>x<=1).length/t.ctp.length;});
   const techRow=t=>{const tt=Object.entries(t.trades).sort((a,b)=>b[1]-a[1])[0][0];
     return `<tr><td>${t.name} <span class="l2">#${String(t.id).padStart(4,'0')} · ${tt}</span></td><td class="r">${fmtN(t.wos.size)}</td><td class="r">${fmtN(t.ctp.length)}</td><td class="r">${fmtK(t.paid)}</td><td class="r">${waitCell(t.med)}</td><td class="r">${waitCell(t.max)}</td><td class="r">${miniBar(t.in1)}</td><td class="r">${t.held}</td></tr>`;};
   const techHead=`<thead><tr><th>Technician</th><th class="r">Jobs</th><th class="r">Payments</th><th class="r">Paid</th><th class="r">Median wait</th><th class="r">Longest</th><th class="r">Within 1 h</th><th class="r">Held</th></tr></thead><tbody>`;
   const none='<tr><td colspan="8" class="empty">No payments match these filters.</td></tr>';
+  const top=[...tm.values()].sort((a,b)=>b.paid-a.paid).slice(0,25);
+  $('#techs').innerHTML=techHead+(top.length?top.map(techRow).join(''):none)+'</tbody>';
   const waiting=[...tm.values()].filter(t=>t.ctp.length>=3).sort((a,b)=>b.med-a.med).slice(0,10);
   $('#techs-slow').innerHTML=techHead+(waiting.length?waiting.map(techRow).join(''):none)+'</tbody>';
 
@@ -1723,7 +1738,7 @@ function setMode(m){
     $('#notice').hidden=true;renderGoalbar();
     renderFlows(-1);renderToday();parts=[];newJourney();
   }
-  setSrc();renderView();if(view!=='analytics')renderPS();
+  setSrc();renderView();
 }
 function setSrc(){
   const el=$('#src');if(!el)return;
