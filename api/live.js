@@ -17,6 +17,8 @@
  *   CLICKUP_FIELD_FM     custom field holding the client / FM (default "FM")
  *   CLICKUP_FIELD_COST   custom field holding the cost (default "Cost")
  *   CLICKUP_FIELD_DESCRIPTION  field the job title is written from (default "WO Description", else the task description)
+ *   CLICKUP_FIELD_COMP   custom field naming the company a job belongs to (default "Comp")
+ *   CLICKUP_COMP_VALUE   only jobs whose Comp is this value are shown (default "SFM")
  *   APP_TZ               time zone that defines "today" (default America/New_York)
  *   ANTHROPIC_API_KEY    optional; turns descriptions into short job titles
  *   DASHBOARD_PASSWORD   required before any real data is served (see middleware.js)
@@ -213,7 +215,11 @@ async function build() {
   const names = { trade: env("CLICKUP_FIELD_TRADE", "Trade"), fm: env("CLICKUP_FIELD_FM", "FM"), cost: env("CLICKUP_FIELD_COST", "Cost"), desc: env("CLICKUP_FIELD_DESCRIPTION", "WO Description") };
 
   const updated = await allTasksUpdatedSince(since);
-  const done = updated.filter((t) => letters(t.status?.status) === doneStatus);
+  // Only this company's jobs (Comp = SFM), checked before the per-task completion-time calls.
+  const compField = env("CLICKUP_FIELD_COMP", "Comp"), compValue = letters(env("CLICKUP_COMP_VALUE", "SFM"));
+  const isComp = (t) => fieldText(field(t, compField)).split(",").some((v) => letters(v) === compValue);
+  const doneAny = updated.filter((t) => letters(t.status?.status) === doneStatus);
+  const done = doneAny.filter(isComp);
 
   // Completion times, a few at a time (ClickUp allows ~100 requests a minute per token).
   const withTimes = [];
@@ -258,11 +264,12 @@ async function build() {
 
   const warnings = [];
   for (const [k, n] of Object.entries(names)) if (jobs.length && !jobs.some((j) => j[k] !== "" && j[k] !== null)) warnings.push(`No value found in the "${n}" field on any of today's tasks`);
+  if (doneAny.length && !doneAny.some((t) => field(t, compField))) warnings.push(`No "${compField}" field found on today's completed tasks, so none are shown`);
   if (aiError) warnings.push(aiError);
   if (!env("ANTHROPIC_API_KEY")) warnings.push("ANTHROPIC_API_KEY is not set, so titles use the first sentence of the description");
 
   const statusesSeen = [...new Set(updated.map((t) => t.status?.status).filter(Boolean))].sort();
-  if (updated.length && !done.length) warnings.push(`No task updated today is in "${env("CLICKUP_DONE_STATUS", "done/incurred")}". Statuses seen today: ${statusesSeen.join(", ")}`);
+  if (updated.length && !doneAny.length) warnings.push(`No task updated today is in "${env("CLICKUP_DONE_STATUS", "done/incurred")}". Statuses seen today: ${statusesSeen.join(", ")}`);
   for (const t of updated) for (const f of t.custom_fields ?? []) seen.add(f.name);
   return { ok: true, source: "clickup", asOf: Date.now(), tz, since, space: scope?.spaceNames ?? scope?.spaceIds, jobs, warnings, fieldsSeen: [...seen].sort(), statusesSeen, tasksReadToday: updated.length };
 }
