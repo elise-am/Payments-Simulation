@@ -708,7 +708,7 @@ body[data-view="analytics"] .bar>.src{display:none}
           <div class="tbl-wrap"><table id="states"></table></div>
         </div>
         <div class="panel">
-          <div class="panel-h"><h2>By payment type</h2><span class="meta">Trip, parts and completion payments</span></div>
+          <div class="panel-h"><h2>By payment type</h2><span class="meta">How fast technicians are paid by each payment method</span></div>
           <div class="tbl-wrap"><table id="ptypes"></table></div>
         </div>
       </div>
@@ -784,7 +784,7 @@ const STATES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California
 const REGIONS={Northeast:'CT ME MA NH RI VT NJ NY PA',Midwest:'IL IN MI OH WI IA KS MN MO NE ND SD',
   South:'DE DC FL GA MD NC SC VA WV AL KY MS TN AR LA OK TX',West:'AZ CO ID MT NV NM UT WY AK CA HI OR WA'};
 const REGION_OF={};for(const[r,list]of Object.entries(REGIONS))for(const s of list.split(' '))REGION_OF[s]=r;
-const METHODS=[{name:'Instant bank transfer',w:71},{name:'Instant to debit card',w:29}];
+const METHODS=[{name:'ACH / Bank Transfer',w:55,rel:1},{name:'Credit Over the Phone',w:28,rel:.8},{name:'Checks',w:12,rel:3},{name:'Zelle & Cash App',note:'Last resort only',w:5,rel:.9}];
 const REASONS=[{name:'Above quoted cost',w:30},{name:'First payment to payee',w:22},{name:'Receipt missing',w:18},{name:'Alternate recipient',w:12},{name:'Possible duplicate',w:7},{name:'Rate above vendor card',w:5}];
 const FLOOR='Above quoted cost';
 const PTYPES=['Trip & diagnostic','Parts advance','Completion'];
@@ -810,8 +810,8 @@ function payTiming(r,trend,type,lowMargin){
   const review=flagged?logn(r,.08,.25)*trend:0;
   let outcome='approved';
   if(flagged){const x=r(),fl=reasons[0]===FLOOR;if(x<(fl?.02:.06))outcome='rejected';else if(x<(fl?.5:.19))outcome='adjusted';}
-  const release=logn(r,.11,.2)*trend;
-  return {raise,verify,flagged,reasons,review,outcome,release,method:wpick(r,METHODS).name,reviewer:pick(r,REVIEWERS)};
+  const M=wpick(r,METHODS),release=logn(r,.11,.2)*trend*M.rel;
+  return {raise,verify,flagged,reasons,review,outcome,release,method:M.name,reviewer:pick(r,REVIEWERS)};
 }
 
 function makeWO(r,d,tClose,trend,seq,pays){
@@ -974,11 +974,11 @@ function enterStep(i){
     `<div class="release"><div class="rbtn" id="rbtn">${ic('send')}<span id="rbtn-t">Release ${usd2.format(J.amount)}</span></div>
      <div class="handoff" id="handoff">Operations<span class="arrow"><i></i></span>Accounts Payable</div></div>`;
   if(s.key==='ap')h=head('Accounts Payable','Accounts Payable issues the payment',`${J.ap} sends it on the technician's chosen method.`)+
-    `<div class="amount" id="amt">$0.00</div><div class="facts"><span>Payment <b>${n} of ${n} · Completion</b></span><span>Method <b>Instant transfer</b></span><span>Reference <b>${J.ref}</b></span><span>To <b>${J.tech}</b></span></div>
+    `<div class="amount" id="amt">$0.00</div><div class="facts"><span>Payment <b>${n} of ${n} · Completion</b></span><span>Method <b>ACH / Bank Transfer</b></span><span>Reference <b>${J.ref}</b></span><span>To <b>${J.tech}</b></span></div>
      <div class="stamp" id="stamp">${ic('check')}Issued</div>`;
   if(s.key==='bank')h=head('Bank','Bank confirms the transfer','The bank verifies the payment and releases the funds.')+
     `<div class="bankbox"><div class="vault" id="vault"><span class="spin"></span>${ic('lock')}</div>
-     <div class="bankmsg" id="bankmsg"><b>Waiting for confirmation…</b><span>Instant transfer · ${J.ref}</span></div></div>`;
+     <div class="bankmsg" id="bankmsg"><b>Waiting for confirmation…</b><span>ACH / Bank Transfer · ${J.ref}</span></div></div>`;
   if(s.key==='paid'){
     const total=J.cum[7];
     h=`<div class="now-h"><span class="d">Technician</span></div><h3 class="paid-h">${J.first} has been paid <em>${usd2.format(J.amount)}</em></h3>
@@ -1027,7 +1027,7 @@ function msg(kind,text){
   if(kind==='in'||kind==='out'){d.className='m enter '+kind;d.textContent=text;}
   if(kind==='pics'||kind==='pics1'){d.className='m out pics enter';const n=kind==='pics'?4:1;
     d.innerHTML=Array.from({length:n},(_,i)=>`<div style="background:${PHOTO_BG[kind==='pics'?i:1]}"></div>`).join('');}
-  if(kind==='dep'){const n=J.types.length;d.className='m dep enter';d.innerHTML=`<div class="k">Deposit received</div><div class="a">${usd2.format(J.amount)}</div><div class="f">From Seamless FM · ${J.wo} · Payment ${n} of ${n} · Instant transfer</div>`;}
+  if(kind==='dep'){const n=J.types.length;d.className='m dep enter';d.innerHTML=`<div class="k">Deposit received</div><div class="a">${usd2.format(J.amount)}</div><div class="f">From Seamless FM · ${J.wo} · Payment ${n} of ${n} · ACH / Bank Transfer</div>`;}
   box.insertBefore(d,$('#typing'));
   const all=box.querySelectorAll('.m');if(all.length>7)all[0].remove();
 }
@@ -1474,7 +1474,7 @@ function renderPayments(){
 
   // structure: payments per work order and payment types
   const wos=c.cur,NW=Math.max(1,wos.length),cnt=[0,0,0,0];wos.forEach(w=>cnt[w.pays.length]++);
-  const types=PTYPES.map(t=>{const ps=S.paid.filter(p=>p.type===t),ctp=ps.map(p=>p.ctp);return {t,n:ps.length,med:median(ctp),p90:pct(ctp,.9),in1:ctp.filter(x=>x<=1).length/Math.max(1,ctp.length)};});
+  const types=METHODS.map(M=>{const ps=S.paid.filter(p=>p.method===M.name),ctp=ps.map(p=>p.ctp);return {t:M.name+(M.note?` <span class="l2">${M.note}</span>`:''),n:ps.length,med:median(ctp),p90:pct(ctp,.9),in1:ctp.filter(x=>x<=1).length/Math.max(1,ctp.length)};});
   const ppj=sum(wos,w=>w.pays.length)/NW;
   $('#ptypes').innerHTML=`<thead><tr><th>Type</th><th class="r">Payments</th><th class="r">Median</th><th class="r">90th pct</th><th class="r">Within 1 h</th></tr></thead><tbody>`+
     types.map(x=>`<tr><td>${x.t}</td><td class="r">${fmtN(x.n)}</td><td class="r">${waitCell(x.med)}</td><td class="r">${fmtH(x.p90)}</td><td class="r">${miniBar(x.in1)}</td></tr>`).join('')+'</tbody>';
@@ -1493,7 +1493,7 @@ function renderPayments(){
   // methods
   const ms=METHODS.map(M=>{const rows=S.paid.filter(p=>p.method===M.name);return {n:M.name,share:rows.length/Math.max(1,S.paid.length),m:median(rows.map(p=>p.ctp))};});
   $('#methods').innerHTML=`<p class="sub-h">Payout method · share and median time</p><div class="hbars">${ms.map(x=>`<div class="hb wide"><span class="name">${x.n}</span><span class="t"><div class="a" style="width:${x.share*100}%"></div></span><span class="pct">${Math.round(x.share*100)}% · ${fmtH(x.m)}</span></div>`).join('')}</div>
-    <p style="margin:0;font-size:12.5px;color:var(--ink-2);max-width:60ch">Every payment goes out instantly. Technicians choose how they want to be paid when they join our network, and can change it at any time.</p>`;
+    <p style="margin:0;font-size:12.5px;color:var(--ink-2);max-width:60ch">Technicians choose how they want to be paid when they join our network, and can change it at any time. Zelle and Cash App are a last resort only.</p>`;
 
   histogram($('#c-hist'),S);trend($('#c-trend'));heat($('#c-heat'),S.paid);cdf($('#c-cdf'),S);byHour($('#c-hour'),S.paid);
 }
