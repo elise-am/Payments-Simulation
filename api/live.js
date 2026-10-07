@@ -7,9 +7,11 @@
  *
  * Settings (Vercel → Project → Settings → Environment Variables):
  *   CLICKUP_TOKEN        personal API token (required)
- *   CLICKUP_TEAM_ID      workspace id (required)
- *   CLICKUP_FOLDER_IDS   comma-separated folder ids to read (this or CLICKUP_LIST_IDS)
- *   CLICKUP_LIST_IDS     comma-separated list ids to read
+ *   CLICKUP_SPACE_NAME   space to read, found by name (default "Vista")
+ *   CLICKUP_TEAM_ID      optional; workspace id (found automatically from the space name)
+ *   CLICKUP_SPACE_IDS    optional; space ids instead of the name
+ *   CLICKUP_FOLDER_IDS   optional; narrow to these folder ids
+ *   CLICKUP_LIST_IDS     optional; narrow to these list ids
  *   CLICKUP_DONE_STATUS  status that means the job is completed (default "done/incurred")
  *   CLICKUP_FIELD_TRADE  custom field holding the trade (default "Trade")
  *   CLICKUP_FIELD_FM     custom field holding the client / FM (default "FM")
@@ -84,13 +86,33 @@ function fieldNumber(f) {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Workspace and space ids: from settings when given, else found by the space's name (cached per instance). */
+let scope = null;
+async function resolveScope() {
+  if (scope) return scope;
+  const spaceName = letters(env("CLICKUP_SPACE_NAME", "Vista"));
+  let teamIds = list("CLICKUP_TEAM_ID");
+  if (!teamIds.length) teamIds = ((await cuGet("/team")).teams ?? []).map((t) => String(t.id));
+  let spaceIds = list("CLICKUP_SPACE_IDS");
+  for (const teamId of teamIds) {
+    if (spaceIds.length) { scope = { teamId, spaceIds }; break; }
+    const spaces = (await cuGet(`/team/${encodeURIComponent(teamId)}/space?archived=false`)).spaces ?? [];
+    const hit = spaces.filter((sp) => letters(sp.name) === spaceName);
+    if (hit.length) { scope = { teamId, spaceIds: hit.map((sp) => String(sp.id)), spaceNames: hit.map((sp) => sp.name) }; break; }
+  }
+  if (!scope) throw new Error(`No ClickUp space named "${env("CLICKUP_SPACE_NAME", "Vista")}" found for this token`);
+  return scope;
+}
+
 async function allTasksUpdatedSince(ms) {
+  const { teamId, spaceIds } = await resolveScope();
   const tasks = [];
   for (let page = 0; page < 20; page++) {
     const q = new URLSearchParams({ include_closed: "true", subtasks: "true", order_by: "updated", date_updated_gt: String(ms), page: String(page) });
+    for (const id of spaceIds) q.append("space_ids[]", id);
     for (const id of list("CLICKUP_FOLDER_IDS")) q.append("project_ids[]", id);
     for (const id of list("CLICKUP_LIST_IDS")) q.append("list_ids[]", id);
-    const r = await cuGet(`/team/${encodeURIComponent(env("CLICKUP_TEAM_ID"))}/task?${q}`);
+    const r = await cuGet(`/team/${encodeURIComponent(teamId)}/task?${q}`);
     tasks.push(...(r.tasks ?? []));
     if (r.last_page !== false || !(r.tasks ?? []).length) break;
   }
@@ -220,14 +242,16 @@ async function build() {
   for (const [k, n] of Object.entries(names)) if (jobs.length && !jobs.some((j) => j[k] !== "" && j[k] !== null)) warnings.push(`No value found in the "${n}" field on any of today's tasks`);
   if (!env("ANTHROPIC_API_KEY")) warnings.push("ANTHROPIC_API_KEY is not set, so titles use the first sentence of the description");
 
-  return { ok: true, source: "clickup", asOf: Date.now(), tz, since, jobs, warnings, fieldsSeen: [...seen].sort(), tasksReadToday: updated.length };
+  const statusesSeen = [...new Set(updated.map((t) => t.status?.status).filter(Boolean))].sort();
+  if (updated.length && !done.length) warnings.push(`No task updated today is in "${env("CLICKUP_DONE_STATUS", "done/incurred")}". Statuses seen today: ${statusesSeen.join(", ")}`);
+  for (const t of updated) for (const f of t.custom_fields ?? []) seen.add(f.name);
+  return { ok: true, source: "clickup", asOf: Date.now(), tz, since, space: scope?.spaceNames ?? scope?.spaceIds, jobs, warnings, fieldsSeen: [...seen].sort(), statusesSeen, tasksReadToday: updated.length };
 }
 
 export async function GET(request) {
   const json = (body, status = 200) => Response.json(body, { status, headers: { "cache-control": "private, no-store" } });
   if (!env("DASHBOARD_PASSWORD")) return json({ ok: false, reason: "locked", message: "Set DASHBOARD_PASSWORD before the dashboard serves real data." });
-  const missing = ["CLICKUP_TOKEN", "CLICKUP_TEAM_ID"].filter((k) => !env(k));
-  if (!list("CLICKUP_FOLDER_IDS").length && !list("CLICKUP_LIST_IDS").length) missing.push("CLICKUP_FOLDER_IDS or CLICKUP_LIST_IDS");
+  const missing = ["CLICKUP_TOKEN"].filter((k) => !env(k));
   if (missing.length) return json({ ok: false, reason: "not_configured", missing });
 
   const force = new URL(request.url).searchParams.get("refresh") === "1";
