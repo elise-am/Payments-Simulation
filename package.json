@@ -1,0 +1,9 @@
+{
+  "name": "payments-simulation",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.131.0",
+    "@vercel/functions": "3.9.11"
+  }
+}

@@ -84,6 +84,13 @@ svg.i{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .tab:focus-visible,.btn:focus-visible{outline:2px solid var(--accent-fill);outline-offset:2px}
 .live-dot{width:7px;height:7px;border-radius:50%;background:var(--good-fill)}
 .bar .spacer{flex:1}
+.src{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
+.src .upd{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.btn:disabled{opacity:.5;cursor:default}
+.notice{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;padding:8px 12px;border-radius:var(--radius);background:var(--warn-soft);color:var(--warn);font-size:12.5px;font-weight:600}
+.notice div{display:flex;align-items:center;gap:8px}
+.notice svg.i{width:16px;height:16px}
+.wo .meta a{color:var(--accent);font-weight:600}
 .sim-chip{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);border:1px dashed var(--border-strong);border-radius:3px;padding:3px 7px}
 .btn{appearance:none;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink);font:600 12px var(--font-body);padding:6px 12px;border-radius:var(--radius);cursor:pointer}
 .btn:hover{border-color:var(--accent-fill)}
@@ -507,7 +514,7 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
       <div class="cal" aria-hidden="true"><span class="mo" id="d-mo"></span><span class="dy num" id="d-dy"></span></div>
       <div class="dt"><b id="d-full"></b><span><span class="live-dot" aria-hidden="true"></span><span id="d-clk"></span></span></div>
     </div>
-    <span class="sim-chip" title="Modeled data for demonstration">Simulated data</span>
+    <div class="src" id="src"><span class="sim-chip" title="Modeled data for demonstration">Simulated data</span></div>
   </header>
 
   <!-- shared filters for the three analytics views -->
@@ -529,6 +536,7 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
   <section id="view-live" role="tabpanel" aria-labelledby="tab-live">
     <div class="kpis sm" id="today"></div>
 
+    <div class="notice" id="notice" role="status" hidden></div>
     <div class="story" id="story">
       <div class="main" id="main">
         <canvas id="confetti" aria-hidden="true"></canvas>
@@ -567,11 +575,11 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
 
     <div class="below">
       <div class="panel">
-        <div class="panel-h"><h2>Also on the way</h2><span class="meta">Other payments moving through the same steps</span></div>
+        <div class="panel-h" id="flows-h"><h2>Also on the way</h2><span class="meta">Other payments moving through the same steps</span></div>
         <ul class="flows" id="flows"></ul>
       </div>
       <div class="panel">
-        <div class="panel-h"><h2>Just paid</h2><span class="meta">Newest first</span></div>
+        <div class="panel-h" id="wall-h"><h2>Just paid</h2><span class="meta">Newest first</span></div>
         <div class="wall" id="wall"></div>
       </div>
     </div>
@@ -1138,7 +1146,7 @@ function tickFlows(dt){
 let last=performance.now();
 function frame(now){
   const dt=Math.min(100,now-last);last=now;
-  if(!paused&&!document.hidden&&!$('#view-live').hidden){update(dt);tickFlows(dt);}
+  if(MODE!=='real'&&!paused&&!document.hidden&&!$('#view-live').hidden){update(dt);tickFlows(dt);}
   drawConfetti();
   requestAnimationFrame(frame);
 }
@@ -1146,7 +1154,7 @@ newJourney();
 requestAnimationFrame(frame);
 
 $('#pause').addEventListener('click',()=>{paused=!paused;$('#pause').textContent=paused?'Resume':'Pause';$('#story').classList.toggle('is-paused',paused);});
-$('#next').addEventListener('click',()=>{parts=[];newJourney();if(paused){paused=false;$('#pause').textContent='Pause';$('#story').classList.remove('is-paused');}});
+$('#next').addEventListener('click',()=>{if(MODE==='real'){if(REAL?.jobs.length)pickReal((realSel+1)%REAL.jobs.length);return;}parts=[];newJourney();if(paused){paused=false;$('#pause').textContent='Pause';$('#story').classList.remove('is-paused');}});
 
 /* ══════════════════ ANALYTICS: shared filters ══════════════════ */
 const F={P:30,trade:'',region:'',client:''};
@@ -1519,12 +1527,127 @@ function select(which){
   view=which;
   VIEWS.forEach(v=>{$('#tab-'+v).setAttribute('aria-selected',v===which);$('#view-'+v).hidden=v!==which;});
   $('#filters').hidden=which==='live';
+  setSrc();
   renderView();
 }
 VIEWS.forEach(v=>$('#tab-'+v).addEventListener('click',()=>select(v)));
 document.querySelector('.tabs').addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;const i=VIEWS.indexOf(view),n=VIEWS[(i+(e.key==='ArrowRight'?1:VIEWS.length-1))%VIEWS.length];select(n);$('#tab-'+n).focus();});
 let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(view==='analytics'&&sub!=='ledger')renderView();},120);});
 const h=location.hash.slice(1);if(h==='analytics')select('analytics');else if(SUBS.includes(h)){select('analytics');selectSub(h);}
+
+/* ══════════════════ REAL DATA: ClickUp jobs on the Live page ══════════════════
+   /api/live returns today's work orders that reached Done/Incurred. The page reads it
+   on load, every minute after that, and whenever Refresh is pressed. Payment steps
+   stay empty until the Teams payment messages are connected. */
+let MODE='sim',REAL=null,realSel=0,realNextAt=0,realBusy=false,realErr='',simWall='';
+const REFRESH_MS=60000;
+const tzTime=ms=>new Date(ms).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); // viewer's local time, same as the header clock
+async function loadReal(force){
+  if(realBusy)return;realBusy=true;setSrc();
+  try{
+    const r=await fetch('/api/live'+(force?'?refresh=1':''),{cache:'no-store'});
+    const j=await r.json().catch(()=>null);
+    if(j&&j.ok){
+      const keep=REAL?.jobs[realSel]?.id;REAL=j;
+      const i=keep?j.jobs.findIndex(x=>x.id===keep):-1;realSel=i>=0?i:0;
+      realErr=j.stale?'ClickUp did not answer, showing the last good read':'';
+      if(MODE==='sim')setMode('real');else if(MODE==='real')renderReal();
+    }else{
+      realErr=!j?'ClickUp unreachable':j.reason==='not_configured'?'ClickUp not connected yet':j.reason==='locked'?'Real data is locked until a dashboard password is set':'ClickUp error: '+(j.message||'');
+    }
+  }catch(e){console.error('Live data:',e);realErr=REAL?'Could not show the ClickUp data':'ClickUp unreachable';}
+  realBusy=false;realNextAt=Date.now()+REFRESH_MS;setSrc();
+}
+function setMode(m){
+  if(m==='real'&&!simWall)simWall=$('#wall').innerHTML;
+  MODE=m;
+  $('#pause').hidden=m==='real';
+  if(m==='real'){renderReal();}
+  else{
+    $('#flows-h').innerHTML='<h2>Also on the way</h2><span class="meta">Other payments moving through the same steps</span>';
+    $('#wall-h').innerHTML='<h2>Just paid</h2><span class="meta">Newest first</span>';
+    if(simWall)$('#wall').innerHTML=simWall;
+    $('#notice').hidden=true;
+    renderFlows(-1);renderToday();parts=[];newJourney();
+  }
+  setSrc();
+}
+function setSrc(){
+  const el=$('#src');if(!el)return;
+  if(view==='analytics'||!REAL){
+    el.innerHTML=`<span class="sim-chip" title="${esc(realErr||'Modeled data for demonstration')}">Simulated data</span>`+(view!=='analytics'&&realErr?`<span class="upd">${esc(realErr)}</span>`:'');
+    return;
+  }
+  const secs=Math.max(0,Math.ceil((realNextAt-Date.now())/1000));
+  el.innerHTML=`<div class="seg" role="group" aria-label="Data source"><button type="button" data-m="real" aria-pressed="${MODE==='real'}">ClickUp</button><button type="button" data-m="demo" aria-pressed="${MODE!=='real'}">Demo</button></div>
+    <span class="upd">${realBusy?'Refreshing…':`Updated ${tzTime(REAL.asOf)} · next in ${secs}s`}${realErr?` · <b class="mg lo">${esc(realErr)}</b>`:''}</span>
+    <button type="button" class="btn" id="refresh"${realBusy?' disabled':''}>Refresh</button>`;
+}
+$('#src').addEventListener('click',e=>{
+  if(e.target.closest('#refresh')){loadReal(true);return;}
+  const b=e.target.closest('[data-m]');if(!b)return;
+  const m=b.dataset.m==='real'?'real':'demo';if(m!==MODE)setMode(m);
+});
+function realKpis(jobs){
+  const withCost=jobs.filter(j=>j.cost!=null);
+  return [['Work orders completed',fmtN(jobs.length),'Moved to Done/Incurred today'],
+    ['Jobs with technician paid','–','Fills in from Teams payment messages'],
+    ['Payments released','–','Fills in from Teams payment messages'],
+    ['Technician cost today',withCost.length?fmtK(sum(withCost,j=>j.cost)):'–',`${withCost.length} of ${jobs.length} jobs have a cost`]]
+    .map(([l,v,s],n)=>`<div class="kpi${n===0?' hero':''}"><span class="lbl">${l}</span><span class="val num">${v}</span><span class="sub">${s}</span></div>`).join('');
+}
+function renderReal(){
+  if(MODE!=='real'||!REAL)return;
+  const jobs=REAL.jobs,j=jobs[realSel];
+  $('#today').innerHTML=realKpis(jobs);
+  const warn=REAL.warnings||[];
+  $('#notice').hidden=!warn.length;$('#notice').innerHTML=warn.map(w=>`<div>${ic('alert')}${esc(w)}</div>`).join('');
+  buildJourney();
+  document.querySelectorAll('.band').forEach((b,n)=>{b.classList.toggle('on',n===0);b.classList.remove('ok');});
+  $('#journey').classList.remove('complete');$('#timer').classList.remove('paid');
+  $('#ph-ava').textContent='?';$('#ph-who').textContent='Technician name comes from Teams';
+  [...$('#msgs').querySelectorAll('.m')].forEach(n=>n.remove());typing(false);
+  const note=document.createElement('div');note.className='m in';note.textContent='Texts to the technician will show here once the Teams payment messages are connected.';
+  $('#msgs').insertBefore(note,$('#typing'));
+  if(!j){
+    $('#wo-title').textContent='No work orders completed yet today';
+    $('#wo-meta').textContent='Waiting for the first ClickUp task to move to Done/Incurred.';
+    $('#timer-v').innerHTML='–';$('#timer-s').textContent='';$('#now').innerHTML='';
+    $('#next').disabled=true;
+  }else{
+    $('#next').disabled=jobs.length<2;
+    $('#wo-title').textContent=j.title;
+    $('#wo-meta').innerHTML=`<b>${esc(j.wo)}</b> · ${esc(j.trade||'Trade not set')} · ${esc(j.fm||'FM not set')} · Cost <b>${j.cost!=null?usd2.format(j.cost):'not set'}</b> · Technician <b>from Teams</b>${j.url?` · <a href="${esc(j.url)}" target="_blank" rel="noopener">Open in ClickUp</a>`:''}`;
+    const st=$('#st-0');st.classList.add('done');st.querySelector('.when').textContent=tzTime(j.completedAt);
+    $('#now').innerHTML=head('Field','Job completed',`${esc(j.wo)} moved to ${esc(j.status)} in ClickUp at ${tzTime(j.completedAt)}.`)+
+      `<div class="prior">The next steps fill in from the Teams payment messages: technician name, amount and payment method when the payment is issued, then the time the technician is paid.${j.titleFromAi?'':' Title taken from the description (AI titles are off or still loading).'}</div>`;
+    realTimer();
+  }
+  $('#flows-h').innerHTML=`<h2>Completed today</h2><span class="meta">${fmtN(jobs.length)} work orders · select one to follow it</span>`;
+  $('#flows').innerHTML=jobs.length?jobs.map((x,n)=>`<li class="flow${n===realSel?' just':''}" data-n="${n}" role="button" tabindex="0" style="cursor:pointer">
+      <div class="who"><b>${esc(x.title)}</b><span>${esc(x.wo)} · ${esc(x.trade||'–')} · <span class="ty">${esc(x.fm||'–')}</span></span></div>
+      <div class="dots" aria-hidden="true">${STEPS.map((_,k)=>`<i class="${k===0?'d':k===1?'a':''}"></i>`).join('')}</div>
+      <div class="st">Completed ${tzTime(x.completedAt)}${x.cost!=null?' · '+fmt$(x.cost):''}</div></li>`).join('')
+    :'<li class="empty">Nothing has reached Done/Incurred today yet.</li>';
+  $('#wall-h').innerHTML='<h2>Just paid</h2><span class="meta">From Teams payment messages</span>';
+  $('#wall').innerHTML='<p class="empty" style="width:100%">Payments show here once the Teams payment messages are connected.</p>';
+}
+function realTimer(){
+  const j=REAL?.jobs[realSel];if(MODE!=='real'||!j)return;
+  $('#timer-lbl').textContent='Since job completed';
+  $('#timer-v').innerHTML=hm((Date.now()-j.completedAt)/60000);
+  $('#timer-s').textContent='Completed '+tzTime(j.completedAt);
+}
+function pickReal(n){realSel=n;renderReal();}
+$('#flows').addEventListener('click',e=>{const li=e.target.closest('li[data-n]');if(li&&MODE==='real')pickReal(+li.dataset.n);});
+$('#flows').addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const li=e.target.closest('li[data-n]');if(li&&MODE==='real'){e.preventDefault();pickReal(+li.dataset.n);}});
+setInterval(()=>{
+  if(!REAL&&!realNextAt)return;
+  if(!document.hidden&&Date.now()>=realNextAt)loadReal(false);
+  else if(view!=='analytics'&&REAL&&!realBusy){const u=document.querySelector('#src .upd');if(u&&!realErr)u.textContent=`Updated ${tzTime(REAL.asOf)} · next in ${Math.max(0,Math.ceil((realNextAt-Date.now())/1000))}s`;}
+  realTimer();
+},1000);
+if(location.protocol.startsWith('http'))loadReal(false);else setSrc();
 })();
 </script>
 

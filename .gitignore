@@ -4,3 +4,5 @@ seamless-payouts.html
 
 .vercel
 .env*
+node_modules
+.claude/launch.json
