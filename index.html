@@ -424,7 +424,15 @@ th.r,td.r{text-align:right;font-variant-numeric:tabular-nums}
 .split-key b{color:var(--ink);font-variant-numeric:tabular-nums}
 
 .wait{font-variant-numeric:tabular-nums;font-weight:600}
-.wait.ok{color:var(--good)} .wait.slow{color:var(--warn)}
+.wait.ok{color:var(--good)} .wait.slow{color:var(--warn)} .wait.late{color:var(--danger)}
+/* overdue payments */
+.od-h{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.od-h h2{display:flex;align-items:center;gap:8px}
+.od-n{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 7px;border-radius:999px;font:700 12px var(--font-num);background:var(--surface-2);color:var(--ink-2)}
+.od-n.on{background:var(--danger-soft);color:var(--danger)}
+.od-sum{display:flex;flex-wrap:wrap;gap:6px 18px;padding:12px 16px;border-bottom:1px solid var(--border);font-size:12.5px;color:var(--ink-2)}
+.od-sum b{color:var(--ink);font-variant-numeric:tabular-nums}
+.od-l{display:block;margin-top:2px}
 td.l2{color:var(--ink-3);font-size:12px}
 .foot-note{margin:0;padding:10px 16px 14px;font-size:12.5px;color:var(--ink-2);max-width:70ch}
 .aging .hb .t div{background:var(--accent-fill)}
@@ -599,8 +607,79 @@ body[data-view="analytics"] .bar>.src{display:none}
     </div>
   </section>
 
-  <!-- ═══════════════ ANALYTICS (real pay speed, today) ═══════════════ -->
+  <!-- filters for the analytics page -->
+  <div class="filters" id="filters" hidden>
+    <div class="fgroup">Period
+      <div class="seg" id="f-period" role="group" aria-label="Period">
+        <button type="button" data-p="7" aria-pressed="false">7 days</button>
+        <button type="button" data-p="30" aria-pressed="true">30 days</button>
+        <button type="button" data-p="90" aria-pressed="false">90 days</button>
+      </div>
+    </div>
+    <label class="fgroup" for="f-trade">Trade <select class="sel" id="f-trade"></select></label>
+    <label class="fgroup" for="f-region">Region <select class="sel" id="f-region"></select></label>
+    <label class="fgroup" for="f-state">State <select class="sel" id="f-state"></select></label>
+    <span class="fnote" id="f-note"></span>
+  </div>
+
+  <!-- ═══════════════ LIVE ═══════════════ -->
+  <section id="view-live" role="tabpanel" aria-labelledby="tab-live">
+    <div class="goalbar" id="goalbar"></div>
+    <div class="kpis sm" id="today"></div>
+
+    <div class="notice" id="notice" role="status" hidden></div>
+    <div class="story" id="story">
+      <div class="main" id="main">
+        <canvas id="confetti" aria-hidden="true"></canvas>
+        <div class="wo">
+          <div>
+            <div class="eyebrow"><span class="live-dot" aria-hidden="true"></span>Following one payment, start to finish</div>
+            <h2 id="wo-title">Rooftop unit not cooling</h2>
+            <div class="meta" id="wo-meta"></div>
+          </div>
+          <div class="timer" id="timer">
+            <div class="lbl" id="timer-lbl">Since job completed</div>
+            <div class="v" id="timer-v">0<small>m</small></div>
+            <div class="s" id="timer-s"></div>
+            <div class="ctl"><button type="button" class="btn" id="pause">Pause</button><button type="button" class="btn" id="next">Next work order</button></div>
+          </div>
+        </div>
+
+        <div class="journey" id="journey">
+          <div class="bands" id="bands"></div>
+          <ol class="steps" id="steps"><li class="rail" aria-hidden="true" style="list-style:none"><span class="fill"></span></li></ol>
+        </div>
+
+        <div class="now" id="now" aria-live="polite"></div>
+      </div>
+
+      <aside class="phone" aria-label="Technician's phone">
+        <div class="ph-top">
+          <div class="notch" aria-hidden="true"></div>
+          <div class="ava" id="ph-ava">MR</div>
+          <b>Seamless FM Dispatch</b>
+          <span id="ph-who">Text messages · Marcus R.</span>
+        </div>
+        <div class="msgs" id="msgs"><div class="typing" id="typing"><i></i><i></i><i></i></div></div>
+      </aside>
+    </div>
+
+    <div class="below">
+      <div class="panel">
+        <div class="panel-h" id="flows-h"><h2>Also on the way</h2><span class="meta">Other payments moving through the same steps</span></div>
+        <ul class="flows" id="flows"></ul>
+      </div>
+      <div class="panel">
+        <div class="panel-h" id="wall-h"><h2>Just paid</h2><span class="meta">Newest first</span></div>
+        <div class="wall" id="wall"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ ANALYTICS: real pay speed today, or the simulated demo ═══════════════ -->
   <section id="view-analytics" role="tabpanel" aria-labelledby="tab-analytics" hidden>
+    <div class="goalbar" id="an-bar"></div>
+    <div id="an-real">
     <div class="a-head">
       <div>
         <div class="range" id="ps-range"></div>
@@ -611,6 +690,15 @@ body[data-view="analytics"] .bar>.src{display:none}
     <div class="notice" id="ps-notice" role="status" hidden></div>
     <ol class="pipe" id="ps-pipe" aria-label="Pay speed, step by step"></ol>
     <div class="kpis sm" id="ps-kpis"></div>
+    <div class="panel" id="ps-od">
+      <div class="panel-h od-h"><h2>Overdue payments <span class="od-n" id="ps-od-n">–</span></h2>
+        <div class="fgroup">Overdue after
+          <div class="seg" id="ps-od-t" role="group" aria-label="Overdue after"></div>
+        </div>
+      </div>
+      <div class="od-sum" id="ps-od-sum" hidden></div>
+      <div class="tbl-wrap"><table id="ps-od-table"></table></div>
+    </div>
     <div class="panel">
       <div class="panel-h"><h2>Today, job by job</h2><span class="meta">Each job on today's clock</span></div>
       <div class="chart gantt-wrap" id="ps-gantt"></div>
@@ -622,6 +710,67 @@ body[data-view="analytics"] .bar>.src{display:none}
       </div>
       <div class="tbl-wrap"><table id="ps-table"></table></div>
     </div>
+    </div>
+
+    <!-- Payment speed -->
+    <div class="sub" id="an-demo" hidden>
+      <div class="a-head">
+        <div>
+          <div class="range" id="p-range"></div>
+          <p class="headline" id="p-headline"></p>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="panel">
+          <div class="panel-h"><h2>How long technicians wait</h2><span class="meta">Minutes from sign-off to technician paid</span></div>
+          <div class="chart" id="c-hist"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><h2>Where the time goes</h2><span class="meta">Median time per step</span></div>
+          <div class="pd" id="lanes"></div>
+        </div>
+      </div>
+      <div class="grid2 even">
+        <div class="panel">
+          <div class="panel-h"><h2>Speed over time</h2><span class="meta" id="trend-meta"></span></div>
+          <div class="chart" id="c-trend"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><h2>When and how payments go out</h2><span class="meta">Payments released by weekday and hour</span></div>
+          <div class="chart" id="c-heat"></div>
+          <div class="pd" id="methods" style="padding-top:4px"></div>
+        </div>
+      </div>
+      <div class="grid2 even">
+        <div class="panel">
+          <div class="panel-h"><h2>Share paid within…</h2><span class="meta">Cumulative share of payments by wait</span></div>
+          <div class="chart" id="c-cdf"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><h2>Speed by sign-off time</h2><span class="meta">Median wait by the hour the job was signed off</span></div>
+          <div class="chart" id="c-hour"></div>
+        </div>
+      </div>
+      <div class="grid2 even">
+        <div class="panel">
+          <div class="panel-h"><h2>By state</h2><span class="meta">How fast technicians are paid in each state</span></div>
+          <div class="tbl-wrap"><table id="states"></table></div>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><h2>By payment type</h2><span class="meta">Trip, parts and completion payments</span></div>
+          <div class="tbl-wrap"><table id="ptypes"></table></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h2>Longest waits</h2><span class="meta">Slowest payments in the period</span></div>
+        <div class="tbl-wrap"><table id="slow"></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h2>Payments per work order</h2><span class="meta">Trip, parts and completion payments</span></div>
+        <div class="pd" id="structure"></div>
+      </div>
+    </div>
+
   </section>
 
 </div>
@@ -1069,6 +1218,9 @@ function durCell(ms,open){
   if(ms<0)return `<span class="wait">${dur(-ms)} before</span>`;
   const h=ms/3600000;return `<span class="wait ${open||h>2?'slow':h<=1?'ok':''}">${open?'waiting ':''}${dur(ms)}</span>`;
 }
+// wait in hours, colored: within 1 h good, over 2 h slow
+function waitCell(h){return isFinite(h)?`<span class="wait ${h<=1?'ok':h>2?'slow':''}">${fmtH(h)}</span>`:'–';}
+function miniBar(x){return `${(x*100).toFixed(1)}%<span class="mini"><i style="width:${x*100}%"></i></span>`;}
 function kpi(l,v,s,cls){return `<div class="kpi${cls?' '+cls:''}"><span class="lbl">${l}</span><span class="val num">${v}</span><span class="sub">${s}</span></div>`;}
 
 async function loadPS(force){
@@ -1088,9 +1240,9 @@ function psUpd(){const secs=Math.max(0,Math.ceil((psNextAt-Date.now())/1000));re
 function psStatus(){$('#ps-status').innerHTML=`<span class="upd">${psUpd()}</span><button type="button" class="btn" id="ps-refresh"${psBusy?' disabled':''}>Refresh</button>`;}
 $('#ps-status').addEventListener('click',e=>{if(e.target.closest('#ps-refresh'))loadPS(true);});
 setInterval(()=>{
-  if(view!=='analytics'||document.hidden||psBusy)return;
+  if(view!=='analytics'||MODE!=='real'||document.hidden||psBusy)return;
   if(Date.now()>=psNextAt)loadPS(false);
-  else{const u=$('#ps-status .upd');if(u)u.textContent=psUpd();}
+  else{const u=$('#ps-status .upd');if(u)u.textContent=psUpd();if(PS&&Date.now()%30000<1000)psOverdue();}
 },1000);
 
 function renderPS(){
@@ -1100,7 +1252,7 @@ function renderPS(){
   if(!PS){
     $('#ps-range').textContent='Today · SFM';
     $('#ps-headline').textContent=psErr?'Real pay speed is not available right now.':'Loading today\'s payments…';
-    ['#ps-pipe','#ps-kpis','#ps-gantt','#ps-table','#ps-chips'].forEach(s=>$(s).innerHTML='');$('#ps-count').textContent='';
+    ['#ps-pipe','#ps-kpis','#ps-gantt','#ps-table','#ps-chips','#ps-od-table'].forEach(s=>$(s).innerHTML='');$('#ps-od-n').textContent='–';$('#ps-od-n').classList.remove('on');$('#ps-od-sum').hidden=true;psOverdue();$('#ps-count').textContent='';
     return;
   }
   const S=PS.summary,now=PS.asOf,T=S.completeToPaid,Q=S.requestToPaid,teams=PS.teamsConnected;
@@ -1133,9 +1285,43 @@ function renderPS(){
     teams?kpi('Waiting now',fmtN(waiting),oldest?`oldest ${dur(oldest)}`:'nothing waiting',hot(oldest)?'warn':''):kpi('Waiting now','–','needs Teams')
   ].join('');
 
+  psOverdue();
   psGantt($('#ps-gantt'),PS.rows,now,PS.since);
   psTable();
 }
+
+/* Overdue: not paid yet, and the clock (from completion, or from the request when there is
+   no completion time) has passed the target. Ages use the viewer's clock so they keep growing
+   between refreshes. */
+const OD_T=[[30,'30 min'],[60,'1 h'],[120,'2 h']];
+let odMin=60;try{const v=+localStorage.getItem('overdueMin');if(OD_T.some(t=>t[0]===v))odMin=v;}catch{}
+function psOverdue(){
+  $('#ps-od-t').innerHTML=OD_T.map(([v,n])=>`<button type="button" data-t="${v}" aria-pressed="${v===odMin}">${n}</button>`).join('');
+  if(!PS)return;
+  const now=Date.now(),T=odMin*60000,teams=PS.teamsConnected;
+  const open=PS.rows.filter(r=>r.stage!=='paid'&&(teams||r.stage==='requested')).map(r=>{
+    const start=r.completedAt??r.requestedAt,stepAt=r.stage==='completed'?r.completedAt:r.requestedAt;
+    return {...r,start,age:now-start,stepAge:now-stepAt};
+  }).filter(r=>r.start);
+  const od=open.filter(r=>r.age>T).sort((a,b)=>b.age-a.age),soon=open.filter(r=>r.age<=T&&r.age>T*.75).length;
+  const n=$('#ps-od-n');n.textContent=fmtN(od.length);n.classList.toggle('on',od.length>0);
+  const head='<thead><tr><th>Work order</th><th>Trade</th><th>Technician</th><th class="r">Amount</th><th>Stuck at</th><th>Clock started</th><th class="r">Waiting</th><th class="r">Over target</th></tr></thead>';
+  const sum$=sum(od.filter(r=>r.amount>0),r=>r.amount),req=od.filter(r=>r.stage==='requested').length;
+  $('#ps-od-sum').hidden=!od.length;
+  $('#ps-od-sum').innerHTML=od.length?`<span><b>${fmtN(od.length-req)}</b> waiting for a request</span><span><b>${fmtN(req)}</b> waiting for 👍</span>${sum$?`<span><b>${fmt$(sum$)}</b> owed to technicians</span>`:''}<span>Oldest <b>${dur(od[0].age)}</b></span>${soon?`<span><b>${fmtN(soon)}</b> more due within ${dur(T*.25)}</span>`:''}`:'';
+  if(!od.length){
+    const msg=!teams?'Until Teams is connected, only payment requests can be checked.':open.length?`Nothing over ${OD_T.find(t=>t[0]===odMin)[1]}. ${fmtN(open.length)} payment${open.length===1?'':'s'} in progress${soon?`, ${fmtN(soon)} due soon`:''}.`:'Nothing waiting. Every job today is paid.';
+    $('#ps-od-table').innerHTML=head+`<tbody><tr><td colspan="8" class="empty">${msg}</td></tr></tbody>`;return;
+  }
+  $('#ps-od-table').innerHTML=head+'<tbody>'+od.map(r=>{
+    const late=r.age>T*2,stuck=r.stage==='completed'?['Waiting for request','w']:['Waiting for 👍','a'];
+    return `<tr><td><b>${esc(r.wo)}</b>${r.title?`<span class="l2 ttl" title="${esc(r.title)}">${esc(r.title)}</span>`:''}</td><td>${esc(r.trade||'–')}</td><td>${esc(r.tech||'–')}</td>
+      <td class="r">${r.amount==null?'–':usd2.format(r.amount)}</td><td><span class="pill ${stuck[1]}">${stuck[0]}</span><span class="l2 od-l">for ${dur(r.stepAge)}</span></td>
+      <td>${clk(r.start)}<span class="l2 od-l">${r.completedAt?'completed':'request sent'}</span></td>
+      <td class="r"><span class="wait ${late?'late':'slow'}">${dur(r.age)}</span></td><td class="r"><span class="pill ${late?'r':'w'}">+${dur(r.age-T)}</span></td></tr>`;
+  }).join('')+'</tbody>';
+}
+$('#ps-od-t').addEventListener('click',e=>{const b=e.target.closest('[data-t]');if(!b)return;odMin=+b.dataset.t;try{localStorage.setItem('overdueMin',odMin);}catch{}psOverdue();});
 
 // one row per job: completed → request (blue), request → 👍 (green), still waiting (amber, faded)
 function psGantt(el,rows,now,since){
@@ -1182,26 +1368,228 @@ function psTable(){
 }
 $('#ps-chips').addEventListener('click',e=>{const b=e.target.closest('.chipf');if(!b)return;psChip=b.dataset.k;psTable();});
 
+/* ══════════════════ DEMO ANALYTICS: simulated payment speed, with filters ══════════════════ */
+const F={P:30,trade:'',region:'',state:''};
+function opts(el,label,list){el.innerHTML=`<option value="">${label}</option>`+list.map(x=>`<option>${esc(x)}</option>`).join('');}
+opts($('#f-trade'),'All trades',TRADES.map(t=>t.name));
+opts($('#f-region'),'All regions',Object.keys(REGIONS));
+// State list follows the chosen region
+function stateOpts(){
+  const list=[...new Set(CITIES.map(c=>c.slice(-2)))].filter(s=>!F.region||REGION_OF[s]===F.region).sort((a,b)=>STATES[a].localeCompare(STATES[b]));
+  if(F.state&&!list.includes(F.state))F.state='';
+  $('#f-state').innerHTML='<option value="">All states</option>'+list.map(s=>`<option value="${s}">${STATES[s]}</option>`).join('');
+  $('#f-state').value=F.state;
+}
+stateOpts();
+
+
+let CTX=null;
+function woMatch(w){return (!F.trade||w.trade===F.trade)&&(!F.region||REGION_OF[w.state]===F.region)&&(!F.state||w.state===F.state);}
+function ctx(){
+  if(CTX)return CTX;
+  const P=F.P,s=NDAY-P,ps=NDAY-2*P;
+  const all=DATA.wos.filter(woMatch);
+  const cur=all.filter(w=>w.day>=s),prev=all.filter(w=>w.day>=ps&&w.day<s);
+  const pays=DATA.pays.filter(p=>woMatch(p.wo));
+  const pCur=pays.filter(p=>p.day>=s),pPrev=pays.filter(p=>p.day>=ps&&p.day<s);
+  // buckets: daily for 7 and 30 days, weekly (built back from the last day) for 90
+  const size=P>30?7:1,bk=[];
+  for(let e=NDAY-1;e>=s;e-=size)bk.unshift({s:Math.max(s,e-size+1),e});
+  const bi=d=>{for(let i=bk.length-1;i>=0;i--)if(d>=bk[i].s)return i;return 0;};
+  CTX={P,s,all,cur,prev,pays,pCur,pPrev,bk,bi,size};
+  return CTX;
+}
+function rangeLabel(c){return `Last ${c.P} days · ${fmtD(c.s)} – ${fmtD(NDAY-1)}, 2026`;}
+function filterText(){const f=[F.trade,F.state?STATES[F.state]:F.region].filter(Boolean);return f.length?f.join(' · '):'All trades and regions';}
+
+function delta(cur,prev,goodUp,mode){
+  if(!isFinite(cur)||!isFinite(prev)||!prev)return '';
+  let d,txt;
+  if(mode==='pp'){d=(cur-prev)*100;txt=(d>=0?'+':'−')+Math.abs(d).toFixed(1)+' pts';}
+  else{d=(cur/prev-1)*100;txt=(d>=0?'+':'−')+Math.abs(d).toFixed(1)+'%';}
+  const flat=Math.abs(d)<(mode==='pp'?.15:.5);
+  const cls=flat?'flat':((d>0)===goodUp?'good':'bad');
+  return `<span class="dl ${cls}">${flat?'±':d>0?'▲':'▼'} ${txt.replace(/^[+−]/,'')}</span>`;
+}
+function kpi(l,v,s,cls){return `<div class="kpi${cls?' '+cls:''}"><span class="lbl">${l}</span><span class="val num">${v}</span><span class="sub">${s}</span></div>`;}
+function bkLabel(c,i){const b=c.bk[i];return c.size===1?fmtD(b.s):fmtD(b.s);}
+
+/* ══════════════════ PAYMENTS ══════════════════ */
+function payStats(ps){
+  const paid=ps.filter(p=>p.ctp!=null),ctp=paid.map(p=>p.ctp);
+  return {paid,ctp,med:median(ctp),p90:pct(ctp,.9),in1:ctp.filter(x=>x<=1).length/Math.max(1,ctp.length),in2:ctp.filter(x=>x<=2).length/Math.max(1,ctp.length),
+    total:sum(paid,p=>p.paidAmount),count:paid.length,techs:new Set(paid.map(p=>p.wo.techId)).size};
+}
+function renderPayments(){
+  const c=ctx(),S=payStats(c.pCur),Sp=payStats(c.pPrev),vs=`vs prior ${c.P} d`;
+  $('#p-range').textContent=rangeLabel(c)+' · '+filterText();
+  $('#p-headline').innerHTML=S.count?`Technicians are paid within <em>${fmtH(S.med)}</em> after sign-off.`:'No payments match these filters.';
+  const mo=30/c.P;
+
+  // where the time goes
+  const auto=S.paid.filter(p=>!p.flagged),rev=S.paid.filter(p=>p.flagged);
+  function lane(name,rows,withReview){
+    if(!rows.length)return '';
+    const parts=[['Sign-off & photos','s-raise',median(rows.map(p=>p.raise))],['Checks','s-check',median(rows.map(p=>p.verify))]];
+    if(withReview)parts.push(['Human review','s-review',median(rows.map(p=>p.review))]);
+    parts.push(['AP → bank → paid','s-release',median(rows.map(p=>p.release))]);
+    const tot=parts.reduce((a,b)=>a+b[2],0);
+    return `<div class="lane"><div class="lane-h"><span><b>${name}</b> · ${Math.round(rows.length/S.paid.length*100)}% of payments</span><span class="tot">${fmtH(median(rows.map(p=>p.ctp)))}</span></div>
+      <div class="stack" aria-hidden="true">${parts.map(p=>`<div class="${p[1]}" style="flex:${p[2]/tot}"></div>`).join('')}</div>
+      <div class="lane-key">${parts.map(p=>`<span><i class="${p[1]}"></i>${p[0]} <b>${fmtH(p[2])}</b></span>`).join('')}</div></div>`;
+  }
+  $('#lanes').innerHTML=lane('Auto-verified',auto,false)+lane('Held for human review',rev,true)+
+    `<p style="margin:14px 0 0;font-size:12.5px;color:var(--ink-2);max-width:60ch">Most payments pass every automatic check and go straight to release. The rest get a second look from AP before any money moves.</p>`;
+
+  // structure: payments per work order and payment types
+  const wos=c.cur,NW=Math.max(1,wos.length),cnt=[0,0,0,0];wos.forEach(w=>cnt[w.pays.length]++);
+  const types=PTYPES.map(t=>{const ps=S.paid.filter(p=>p.type===t),ctp=ps.map(p=>p.ctp);return {t,n:ps.length,med:median(ctp),p90:pct(ctp,.9),in1:ctp.filter(x=>x<=1).length/Math.max(1,ctp.length)};});
+  const ppj=sum(wos,w=>w.pays.length)/NW;
+  $('#structure').innerHTML=`<div class="big3">
+      <div><span class="v">${ppj.toFixed(2)}</span><span class="l">payments per work order</span></div>
+      <div><span class="v">${fmt$(S.total/Math.max(1,S.count))}</span><span class="l">average payment</span></div>
+      <div><span class="v">${fmtN(S.count*mo)}</span><span class="l">payments a month at this pace</span></div></div>
+    <p class="sub-h">Work orders by number of payments</p>
+    <div class="hbars">${[1,2,3].map(k=>`<div class="hb"><span class="name">${k} payment${k>1?'s':''}</span><span class="t"><div class="a" style="width:${cnt[k]/NW*100}%"></div></span><span class="pct">${Math.round(cnt[k]/NW*100)}%</span></div>`).join('')}</div>`;
+  $('#ptypes').innerHTML=`<thead><tr><th>Type</th><th class="r">Payments</th><th class="r">Median</th><th class="r">90th pct</th><th class="r">Within 1 h</th></tr></thead><tbody>`+
+    types.map(x=>`<tr><td>${x.t}</td><td class="r">${fmtN(x.n)}</td><td class="r">${waitCell(x.med)}</td><td class="r">${fmtH(x.p90)}</td><td class="r">${miniBar(x.in1)}</td></tr>`).join('')+'</tbody>';
+
+  // by state
+  const st=[...new Set(S.paid.map(p=>p.wo.state))].map(k=>{const ctp=S.paid.filter(p=>p.wo.state===k).map(p=>p.ctp);
+    return {k,n:ctp.length,m:median(ctp),p90:pct(ctp,.9),in1:ctp.filter(x=>x<=1).length/Math.max(1,ctp.length)};}).sort((a,b)=>b.n-a.n);
+  $('#states').innerHTML=`<thead><tr><th>State</th><th class="r">Payments</th><th class="r">Median</th><th class="r">90th pct</th><th class="r">Within 1 h</th></tr></thead><tbody>`+
+    (st.length?st.map(x=>`<tr><td>${STATES[x.k]} <span class="l2">${REGION_OF[x.k]}</span></td><td class="r">${fmtN(x.n)}</td><td class="r">${waitCell(x.m)}</td><td class="r">${fmtH(x.p90)}</td><td class="r">${miniBar(x.in1)}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">No payments match these filters.</td></tr>')+'</tbody>';
+
+  // slowest payments
+  const slow=[...S.paid].sort((a,b)=>b.ctp-a.ctp).slice(0,12);
+  $('#slow').innerHTML=`<thead><tr><th>Work order</th><th>Technician</th><th>Trade</th><th>Payment</th><th>Signed off</th><th class="r">Waited</th><th>Why</th></tr></thead><tbody>`+
+    (slow.length?slow.map(p=>`<tr><td><b>${p.wo.id}</b></td><td>${p.wo.tech}</td><td>${p.wo.trade}</td><td>${p.type}</td><td>${fmtDT(p.tTrigger)}</td><td class="r">${waitCell(p.ctp)}</td><td>${p.flagged?`<span class="pill w">Held · ${esc(p.reasons.join(', '))}</span>`:'<span class="pill n">Not held</span>'}</td></tr>`).join(''):'<tr><td colspan="7" class="empty">No payments match these filters.</td></tr>')+'</tbody>';
+
+  // methods
+  const ms=METHODS.map(M=>{const rows=S.paid.filter(p=>p.method===M.name);return {n:M.name,share:rows.length/Math.max(1,S.paid.length),m:median(rows.map(p=>p.ctp))};});
+  $('#methods').innerHTML=`<p class="sub-h">Payout method · share and median time</p><div class="hbars">${ms.map(x=>`<div class="hb wide"><span class="name">${x.n}</span><span class="t"><div class="a" style="width:${x.share*100}%"></div></span><span class="pct">${Math.round(x.share*100)}% · ${fmtH(x.m)}</span></div>`).join('')}</div>
+    <p style="margin:0;font-size:12.5px;color:var(--ink-2);max-width:60ch">Every payment goes out instantly. Technicians choose how they want to be paid when they join our network, and can change it at any time.</p>`;
+
+  histogram($('#c-hist'),S);trend($('#c-trend'));heat($('#c-heat'),S.paid);cdf($('#c-cdf'),S);byHour($('#c-hour'),S.paid);
+}
+
+function histogram(el,S){
+  const ctpAll=S.ctp,N=Math.max(1,ctpAll.length);
+  const W=Math.max(280,el.clientWidth-24),H=230,m={l:36,r:10,t:40,b:28},iw=W-m.l-m.r,ih=H-m.t-m.b;
+  const NB=19,bins=new Array(NB).fill(0);ctpAll.forEach(v=>bins[Math.min(NB-1,Math.floor(v*6))]++);
+  const share=bins.map(b=>b/N*100);const ymax=Math.max(5,Math.ceil(Math.max(...share)/5)*5);
+  const bw=iw/NB,y=v=>m.t+ih-v/ymax*ih,x=mn=>m.l+Math.min(mn,180)/10*bw;
+  let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Histogram of minutes from sign-off to technician paid">`;
+  for(let v=0;v<=ymax;v+=5){s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${m.l-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--ink-3)">${v}%</text>`;}
+  share.forEach((v,i)=>{const h=ih*v/ymax;s+=`<rect x="${m.l+i*bw+1}" y="${m.t+ih-h}" width="${Math.max(1,bw-2)}" height="${h}" rx="1.5" fill="${i<6?'var(--good-fill)':'var(--accent-fill)'}" opacity="${i<6?1:.6}"/>`;});
+  const step=W<480?60:30;
+  for(let mn=0;mn<=180;mn+=step){s+=`<text x="${x(mn)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--ink-3)">${mn===180?'3 h+':mn<60?mn+' min':mn/60+' h'}</text>`;}
+  if(isFinite(S.med))[[S.med,'Median '+fmtH(S.med),m.t-24],[S.p90,'90th pct '+fmtH(S.p90),m.t-8]].forEach(([v,l,ty])=>{
+    s+=`<line x1="${x(v*60)}" x2="${x(v*60)}" y1="${ty+4}" y2="${m.t+ih}" stroke="var(--ink)" stroke-dasharray="3 3" stroke-width="1"/><text x="${x(v*60)+5}" y="${ty+1}" font-size="11.5" font-weight="600" fill="var(--ink)">${l}</text>`;});
+  s+=`<text x="${W-m.r}" y="${m.t+12}" text-anchor="end" font-size="11" fill="var(--ink-3)">Green bars: paid within the hour</text>`;
+  el.innerHTML=s+'</svg>';
+}
+function trend(el){
+  const c=ctx(),groups=c.bk.map(()=>[]);
+  c.pCur.forEach(p=>{if(p.ctp!=null)groups[c.bi(p.day)].push(p.ctp*60);});
+  const pts=groups.map((g,i)=>({i,med:median(g),p90:pct(g,.9)})).filter(p=>isFinite(p.med));
+  $('#trend-meta').textContent=(c.size===1?'Per day':'Per week')+' · minutes, sign-off → paid';
+  const W=Math.max(280,el.clientWidth-24),H=230,m={l:52,r:14,t:26,b:28},iw=W-m.l-m.r,ih=H-m.t-m.b;
+  if(!pts.length){el.innerHTML='<p class="empty">No payments in this period.</p>';return;}
+  const n=c.bk.length,ymax=Math.ceil(Math.max(...pts.map(w=>w.p90))/15)*15,x=i=>m.l+(n===1?iw/2:i/(n-1)*iw),y=v=>m.t+ih-v/ymax*ih;
+  let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Median and 90th percentile minutes to payment over time">`;
+  for(let v=0;v<=ymax;v+=15){s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${m.l-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--ink-3)">${v} min</text>`;}
+  const ln=k=>pts.map((w,j)=>(j?'L':'M')+x(w.i).toFixed(1)+' '+y(w[k]).toFixed(1)).join(' ');
+  const L=pts[pts.length-1],F0=pts[0];
+  s+=`<path d="${ln('med')} L${x(L.i)} ${m.t+ih} L${x(F0.i)} ${m.t+ih} Z" fill="var(--good-soft)"/>`;
+  s+=`<path d="${ln('p90')}" fill="none" stroke="var(--ink-3)" stroke-width="1.5" stroke-dasharray="4 4"/>`;
+  s+=`<path d="${ln('med')}" fill="none" stroke="var(--good-fill)" stroke-width="2.25"/>`;
+  s+=`<circle cx="${x(L.i)}" cy="${y(L.med)}" r="4" fill="var(--good-fill)"/><circle cx="${x(L.i)}" cy="${y(L.p90)}" r="3" fill="var(--ink-3)"/>`;
+  s+=`<text x="${x(L.i)-8}" y="${y(L.med)-10}" text-anchor="end" font-size="11.5" font-weight="600" fill="var(--good)">Median ${fmtH(L.med/60)}</text>`;
+  s+=`<text x="${x(L.i)-8}" y="${Math.min(m.t+ih-4,y(L.p90)+16)}" text-anchor="end" font-size="11" fill="var(--ink-2)">90th pct ${fmtH(L.p90/60)}</text>`;
+  const every=Math.ceil(n/Math.max(1,Math.floor(iw/58)));
+  c.bk.forEach((b,i)=>{if((n-1-i)%every===0)s+=`<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--ink-3)">${bkLabel(c,i)}</text>`;});
+  const ch=1-L.med/F0.med;
+  s+=`<text x="${m.l}" y="14" font-size="11.5" fill="var(--ink-2)">Median ${ch>=0?'down':'up'} <tspan font-weight="700" fill="${ch>=0?'var(--good)':'var(--danger)'}">${Math.abs(Math.round(ch*100))}%</tspan> since ${bkLabel(c,F0.i)}</text>`;
+  el.innerHTML=s+'</svg>';
+}
+// cumulative share of payments paid by each wait, 0–2 h
+function cdf(el,S){
+  const W=Math.max(280,el.clientWidth-24),H=230,m={l:40,r:14,t:16,b:28},iw=W-m.l-m.r,ih=H-m.t-m.b,MAXM=120;
+  if(!S.ctp.length){el.innerHTML='<p class="empty">No payments in this period.</p>';return;}
+  const sorted=Float64Array.from(S.ctp.map(h=>h*60)).sort(),N=sorted.length;
+  const at=mn=>{let lo=0,hi=N;while(lo<hi){const k=(lo+hi)>>1;if(sorted[k]<=mn)lo=k+1;else hi=k;}return lo/N;};
+  const x=mn=>m.l+mn/MAXM*iw,y=v=>m.t+ih-v*ih;
+  let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Cumulative share of payments paid by minutes after sign-off">`;
+  for(let v=0;v<=1.0001;v+=.25)s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${m.l-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--ink-3)">${Math.round(v*100)}%</text>`;
+  const pts=[];for(let mn=0;mn<=MAXM;mn+=2)pts.push([x(mn),y(at(mn))]);
+  const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  s+=`<path d="${d} L${x(MAXM)} ${y(0)} L${x(0)} ${y(0)} Z" fill="var(--good-soft)"/><path d="${d}" fill="none" stroke="var(--good-fill)" stroke-width="2.25"/>`;
+  [[15,'15 min'],[30,'30 min'],[60,'1 h']].forEach(([mn,l])=>{const v=at(mn);
+    s+=`<line x1="${x(mn)}" x2="${x(mn)}" y1="${y(v)}" y2="${y(0)}" stroke="var(--ink)" stroke-dasharray="3 3"/><circle cx="${x(mn)}" cy="${y(v)}" r="3.5" fill="var(--ink)"/><text x="${x(mn)+6}" y="${y(v)-7}" font-size="11.5" font-weight="600" fill="var(--ink)">${fmtP(v,0)} by ${l}</text>`;});
+  for(let mn=0;mn<=MAXM;mn+=W<480?60:30)s+=`<text x="${x(mn)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--ink-3)">${mn<60?mn+' min':mn/60+' h'}</text>`;
+  el.innerHTML=s+'</svg>';
+}
+// median wait by the hour of day the payment was triggered (sign-off)
+function byHour(el,paid){
+  const g=Array.from({length:24},()=>[]);
+  paid.forEach(p=>g[Math.min(23,Math.floor(((p.tTrigger%24)+24)%24))].push(p.ctp*60));
+  const md=g.map(a=>median(a));
+  const W=Math.max(280,el.clientWidth-24),H=230,m={l:44,r:10,t:16,b:28},iw=W-m.l-m.r,ih=H-m.t-m.b;
+  const ymax=Math.max(15,Math.ceil(Math.max(...md.filter(isFinite),0)/15)*15),bw=iw/24,y=v=>m.t+ih-v/ymax*ih;
+  let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Median minutes to payment by hour of sign-off">`;
+  for(let v=0;v<=ymax;v+=15)s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${m.l-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--ink-3)">${v} min</text>`;
+  md.forEach((v,h)=>{if(!isFinite(v))return;const bh=ih*v/ymax;
+    s+=`<rect x="${m.l+h*bw+1}" y="${m.t+ih-bh}" width="${Math.max(1,bw-2)}" height="${bh}" rx="1.5" fill="${v<=60?'var(--good-fill)':'var(--warn-fill)'}"><title>Signed off ${clockStr(h)}–${clockStr(h+1)}: median ${fmtH(v/60)} · ${fmtN(g[h].length)} payments</title></rect>`;});
+  [0,6,12,18].forEach(h=>s+=`<text x="${m.l+h*bw}" y="${H-8}" font-size="11" fill="var(--ink-3)">${h===0?'12 AM':h===12?'12 PM':h<12?h+' AM':(h-12)+' PM'}</text>`);
+  el.innerHTML=s+'</svg>';
+}
+function heat(el,paid){
+  const g=Array.from({length:7},()=>new Array(24).fill(0));
+  paid.forEach(p=>{const d=Math.floor(p.tPaid/24),dow=(dDate(d).getDay()+6)%7,h=Math.floor(p.tPaid-d*24);g[dow][Math.min(23,h)]++;});
+  const max=Math.max(1,...g.flat()),days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const W=Math.max(280,el.clientWidth-24),m={l:34,r:6,t:6,b:22},cw=(W-m.l-m.r)/24,chh=18,H=m.t+chh*7+m.b;
+  let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Payments released by weekday and hour">`;
+  g.forEach((row,r)=>{s+=`<text x="${m.l-6}" y="${m.t+r*chh+13}" text-anchor="end" font-size="11" fill="var(--ink-3)">${days[r]}</text>`;
+    row.forEach((v,h)=>{s+=`<rect x="${m.l+h*cw+1}" y="${m.t+r*chh+1}" width="${Math.max(1,cw-2)}" height="${chh-2}" rx="2" fill="${v?'var(--accent-fill)':'var(--track)'}" opacity="${v?(.12+.88*v/max).toFixed(2):1}"><title>${days[r]} ${clockStr(h)}: ${fmtN(v)} payments</title></rect>`;});});
+  [0,6,12,18].forEach(h=>s+=`<text x="${m.l+h*cw}" y="${H-6}" font-size="11" fill="var(--ink-3)">${h===0?'12 AM':h===12?'12 PM':h<12?h+' AM':(h-12)+' PM'}</text>`);
+  el.innerHTML=s+'</svg>';
+}
+
 // Sign out shows only when the password gate signed this browser in (middleware.js sets sfm_auth)
 try{$('#signout').hidden=!/(^|; )sfm_auth=1(;|$)/.test(document.cookie);}catch{}
 
 /* ── tabs ── */
 let view='live';
+/* Analytics follows the same Real data / Demo choice as Live. */
 function renderView(){
   if(view!=='analytics')return;
+  const demo=MODE!=='real';
+  $('#an-bar').innerHTML=`<span class="gl">${demo?'Demo · simulated payments':'Real data · today'}</span>
+    <div class="seg" role="group" aria-label="Data"><button type="button" data-m="real" aria-pressed="${!demo}">Real data</button><button type="button" data-m="demo" aria-pressed="${demo}">Demo</button></div>`;
+  $('#an-real').hidden=demo;$('#an-demo').hidden=!demo;$('#filters').hidden=!demo;
+  if(demo){renderPayments();const c=ctx();$('#f-note').innerHTML=`<b>${fmtN(c.cur.length)}</b> work orders · <b>${fmtN(c.pCur.length)}</b> payments in view`;return;}
   if(!PS&&!psErr&&!psBusy)loadPS(false);else renderPS();
 }
+$('#an-bar').addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b)return;const v=b.dataset.m==='real'?'real':'demo';if(v!==MODE)setMode(v);});
+function setFilter(k,v){F[k]=v;CTX=null;renderView();}
+$('#f-period').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('#f-period button').forEach(x=>x.setAttribute('aria-pressed',x===b));setFilter('P',+b.dataset.p);});
+$('#f-trade').addEventListener('change',e=>setFilter('trade',e.target.value));
+$('#f-region').addEventListener('change',e=>{F.region=e.target.value;stateOpts();setFilter('region',F.region);});
+$('#f-state').addEventListener('change',e=>setFilter('state',e.target.value));
+
 const VIEWS=['live','analytics'];
 function select(which){
   view=which;
   VIEWS.forEach(v=>{$('#tab-'+v).setAttribute('aria-selected',v===which);$('#view-'+v).hidden=v!==which;});
+  if(which==='live')$('#filters').hidden=true;
   document.body.dataset.view=which; // the header's ClickUp status belongs to Live; Analytics shows its own
   setSrc();
   renderView();
 }
 VIEWS.forEach(v=>$('#tab-'+v).addEventListener('click',()=>select(v)));
 document.querySelector('.tabs').addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;const i=VIEWS.indexOf(view),n=VIEWS[(i+(e.key==='ArrowRight'?1:VIEWS.length-1))%VIEWS.length];select(n);$('#tab-'+n).focus();});
-let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(view==='analytics'&&PS)psGantt($('#ps-gantt'),PS.rows,PS.asOf,PS.since);},120);});
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(view!=='analytics')return;if(MODE!=='real')renderView();else if(PS)psGantt($('#ps-gantt'),PS.rows,PS.asOf,PS.since);},120);});
 
 /* ══════════════════ REAL DATA: ClickUp jobs on the Live page ══════════════════
    /api/live returns today's work orders that reached Done/Incurred. The page reads it
@@ -1240,7 +1628,7 @@ function setMode(m){
     $('#notice').hidden=true;renderGoalbar();
     renderFlows(-1);renderToday();parts=[];newJourney();
   }
-  setSrc();
+  setSrc();renderView();
 }
 function setSrc(){
   const el=$('#src');if(!el)return;
