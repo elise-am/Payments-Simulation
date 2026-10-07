@@ -528,7 +528,6 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
     </div>
     <label class="fgroup" for="f-trade">Trade <select class="sel" id="f-trade"></select></label>
     <label class="fgroup" for="f-region">Region <select class="sel" id="f-region"></select></label>
-    <label class="fgroup" for="f-client">Client <select class="sel" id="f-client"></select></label>
     <span class="fnote" id="f-note"></span>
   </div>
 
@@ -590,7 +589,7 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
     <nav class="subtabs" id="subtabs" role="tablist" aria-label="Analytics sections">
       <button class="subtab" role="tab" data-sub="overview" aria-selected="true">Overview</button>
       <button class="subtab" role="tab" data-sub="profit" aria-selected="false">Profitability</button>
-      <button class="subtab" role="tab" data-sub="clients" aria-selected="false">Clients &amp; cash</button>
+      <button class="subtab" role="tab" data-sub="clients" aria-selected="false">Cash</button>
       <button class="subtab" role="tab" data-sub="speed" aria-selected="false">Payment speed</button>
       <button class="subtab" role="tab" data-sub="review" aria-selected="false">Review</button>
       <button class="subtab" role="tab" data-sub="techs" aria-selected="false">Technicians</button>
@@ -640,17 +639,11 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
       </div>
     </div>
 
-    <!-- Clients & cash -->
+    <!-- Cash -->
     <div class="sub" id="sub-clients" role="tabpanel" hidden>
-      <div class="grid2">
-        <div class="panel">
-          <div class="panel-h"><h2>By client</h2><span class="meta">Revenue, margin and how fast they pay</span></div>
-          <div class="tbl-wrap"><table id="b-clients"></table></div>
-        </div>
-        <div class="panel">
-          <div class="panel-h"><h2>Cash cycle</h2><span class="meta">Technicians paid now, clients pay later</span></div>
-          <div class="pd" id="b-cash"></div>
-        </div>
+      <div class="panel">
+        <div class="panel-h"><h2>Cash cycle</h2><span class="meta">Technicians paid now, clients pay later</span></div>
+        <div class="pd" id="b-cash"></div>
       </div>
     </div>
 
@@ -1157,14 +1150,14 @@ $('#pause').addEventListener('click',()=>{paused=!paused;$('#pause').textContent
 $('#next').addEventListener('click',()=>{if(MODE==='real'){if(REAL?.jobs.length)pickReal((realSel+1)%REAL.jobs.length);return;}parts=[];newJourney();if(paused){paused=false;$('#pause').textContent='Pause';$('#story').classList.remove('is-paused');}});
 
 /* ══════════════════ ANALYTICS: shared filters ══════════════════ */
-const F={P:30,trade:'',region:'',client:''};
+const F={P:30,trade:'',region:''};
 function opts(el,label,list){el.innerHTML=`<option value="">${label}</option>`+list.map(x=>`<option>${esc(x)}</option>`).join('');}
 opts($('#f-trade'),'All trades',TRADES.map(t=>t.name));
 opts($('#f-region'),'All regions',REGIONS);
-opts($('#f-client'),'All clients',CLIENTS.map(c=>c.name));
+
 
 let CTX=null;
-function woMatch(w){return (!F.trade||w.trade===F.trade)&&(!F.region||w.region===F.region)&&(!F.client||w.client===F.client);}
+function woMatch(w){return (!F.trade||w.trade===F.trade)&&(!F.region||w.region===F.region);}
 function ctx(){
   if(CTX)return CTX;
   const P=F.P,s=NDAY-P,ps=NDAY-2*P;
@@ -1180,7 +1173,7 @@ function ctx(){
   return CTX;
 }
 function rangeLabel(c){return `Last ${c.P} days · ${fmtD(c.s)} – ${fmtD(NDAY-1)}, 2026`;}
-function filterText(){const f=[F.trade,F.region,F.client].filter(Boolean);return f.length?f.join(' · '):'All trades, regions and clients';}
+function filterText(){const f=[F.trade,F.region].filter(Boolean);return f.length?f.join(' · '):'All trades and regions';}
 
 function delta(cur,prev,goodUp,mode){
   if(!isFinite(cur)||!isFinite(prev)||!prev)return '';
@@ -1228,18 +1221,6 @@ function renderBusiness(){
   };
   $('#b-trades').innerHTML=rowsFor('trade',TRADES.map(t=>t.name),'Trade');
   $('#b-regions').innerHTML=rowsFor('region',REGIONS,'Region');
-
-  // clients: revenue, margin, days to collect, outstanding today
-  const cl=CLIENTS.map(C=>{
-    const ws=c.cur.filter(w=>w.client===C.name),b=biz(ws);
-    const paid=c.all.filter(w=>w.client===C.name&&w.collectT<=NOW&&w.collectT>=c.s*24).map(w=>(w.collectT-w.invoiceT)/24);
-    const open=c.all.filter(w=>w.client===C.name&&w.collectT>NOW&&w.invoiceT<=NOW);
-    const over=open.filter(w=>w.dueT<NOW);
-    return {C,b,dso:median(paid),open:sum(open,w=>w.billed),over:sum(over,w=>w.billed)};
-  }).filter(x=>x.b.n).sort((a,b)=>b.b.rev-a.b.rev);
-  $('#b-clients').innerHTML=`<thead><tr><th>Client</th><th class="r">Jobs</th><th class="r">Billed</th><th class="r">Margin</th><th class="r">Terms</th><th class="r">Pays in</th><th class="r">Open</th><th class="r">Overdue</th></tr></thead><tbody>`+
-    cl.map(x=>`<tr><td>${esc(x.C.name)}</td><td class="r">${fmtN(x.b.n)}</td><td class="r">${fmtK(x.b.rev)}</td><td class="r">${mgCell(x.b.mg)}</td><td class="r">Net ${x.C.terms}</td>
-      <td class="r"><span class="${x.dso>x.C.terms+5?'mg lo':''}">${isFinite(x.dso)?Math.round(x.dso)+' d':'–'}</span></td><td class="r">${fmtK(x.open)}</td><td class="r">${x.over?`<span class="mg lo">${fmtK(x.over)}</span>`:'–'}</td></tr>`).join('')+'</tbody>';
 
   // cash cycle
   const comp=c.pCur.filter(p=>p.type==='Completion'&&p.ctp!=null).map(p=>p.ctp);
@@ -1520,7 +1501,6 @@ function setFilter(k,v){F[k]=v;CTX=null;L.open=null;L.show=40;renderView();}
 $('#f-period').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('#f-period button').forEach(x=>x.setAttribute('aria-pressed',x===b));setFilter('P',+b.dataset.p);});
 $('#f-trade').addEventListener('change',e=>setFilter('trade',e.target.value));
 $('#f-region').addEventListener('change',e=>setFilter('region',e.target.value));
-$('#f-client').addEventListener('change',e=>setFilter('client',e.target.value));
 
 const VIEWS=['live','analytics'];
 function select(which){
