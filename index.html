@@ -647,17 +647,10 @@ body[data-view="analytics"] .bar>.src{display:none}
       <div class="panel-h"><h2>Today, job by job</h2><span class="meta">Each job on today's clock</span></div>
       <div class="chart gantt-wrap" id="ps-gantt"></div>
     </div>
-    <div class="panel">
-      <div class="l-bar">
-        <div class="chipsf" id="ps-chips" role="group" aria-label="Show"></div>
-        <span class="l-count" id="ps-count"></span>
-      </div>
-      <div class="tbl-wrap"><table id="ps-table"></table></div>
-    </div>
 
     <!-- speed history and breakdowns: simulated until real payments are saved day by day -->
     <h2 class="sec-h">Speed history and breakdowns</h2>
-    <div class="panel hist-real" id="hist-real" hidden><p class="empty">Real data covers today only so far. Speed over 7, 30 and 90 days, review times, and speed by state, trade, payment type and technician fills in once real payments are saved day by day. Switch to <b>Demo</b> to see these dashboards with simulated data.</p></div>
+    <div class="panel hist-real" id="hist-real" hidden><p class="empty">Real data covers today only so far. Speed over 7, 30 and 90 days, review times, and speed by state, trade and payment type fills in once real payments are saved day by day. Switch to <b>Demo</b> to see these dashboards with simulated data.</p></div>
     <div id="hist-demo" hidden>
       <div class="a-head">
         <div>
@@ -725,14 +718,6 @@ body[data-view="analytics"] .bar>.src{display:none}
           <div class="panel-h"><h2>By trade</h2><span class="meta">Payments released, held and paid within the hour</span></div>
           <div class="tbl-wrap"><table id="trades"></table></div>
         </div>
-      </div>
-      <div class="panel">
-        <div class="panel-h"><h2>Top technicians</h2><span class="meta">By amount paid in the period, with how fast each was paid</span></div>
-        <div class="tbl-wrap"><table id="techs"></table></div>
-      </div>
-      <div class="panel">
-        <div class="panel-h"><h2>Technicians waiting longest</h2><span class="meta">Highest median wait, technicians with 3+ payments</span></div>
-        <div class="tbl-wrap"><table id="techs-slow"></table></div>
       </div>
     </div>
   </section>
@@ -1172,7 +1157,7 @@ $('#next').addEventListener('click',()=>{if(MODE==='real'){if(REAL?.jobs.length)
    job completed (ClickUp) → request sent (Teams message) → paid (👍 on that message).
    Read when the tab opens, every minute while it is open, and on Refresh. */
 const PS_MS=60000;
-let PS=null,psErr='',psBusy=false,psNextAt=0,psChip='all';
+let PS=null,psErr='',psBusy=false,psNextAt=0;
 const clk=ms=>new Date(ms).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); // viewer's local time, like Live
 function dur(ms){if(ms==null||!isFinite(ms))return '–';const m=Math.max(0,Math.round(ms/60000));if(m<60)return m+' min';const h=Math.floor(m/60);return h<24?`${h} h ${String(m%60).padStart(2,'0')} min`:`${Math.floor(h/24)} d ${h%24} h`;}
 function durBig(ms){return ms==null||!isFinite(ms)?'–':hm(ms/60000);}
@@ -1274,7 +1259,7 @@ function renderPS(){
   if(!D){
     $('#ps-range').textContent='Today · SFM';
     $('#ps-headline').textContent=MODE==='real'&&psErr?'Real pay speed is not available right now.':'Loading today\'s payments…';
-    ['#ps-pipe','#ps-kpis','#ps-gantt','#ps-table','#ps-chips'].forEach(s=>$(s).innerHTML='');['ps-od'].forEach(P=>{$(`#${P}-table`).innerHTML='';$(`#${P}-n`).textContent='–';$(`#${P}-n`).classList.remove('on');$(`#${P}-sum`).hidden=true;});psOverdue();$('#ps-count').textContent='';
+    ['#ps-pipe','#ps-kpis','#ps-gantt'].forEach(s=>$(s).innerHTML='');['ps-od'].forEach(P=>{$(`#${P}-table`).innerHTML='';$(`#${P}-n`).textContent='–';$(`#${P}-n`).classList.remove('on');$(`#${P}-sum`).hidden=true;});psOverdue();$('#ps-count').textContent='';
     return;
   }
   const S=D.summary,now=D.asOf,T=S.completeToPaid,Q=S.requestToPaid,teams=D.teamsConnected;
@@ -1307,7 +1292,6 @@ function renderPS(){
 
   psOverdue();
   psGantt($('#ps-gantt'),D.rows,now,D.since);
-  psTable();
 }
 
 /* Overdue: not paid yet, and the clock (from completion, or from the request when there is
@@ -1369,27 +1353,6 @@ function psGantt(el,rows,now,since){
   el.innerHTML=`<div class="split-key" style="margin:0 0 8px"><span><i class="k2"></i>Completed → request sent</span><span><i class="k1"></i>Request → 👍 paid</span><span><i class="k3" style="opacity:.45"></i>Still waiting</span><span>Dashed line: now</span></div><div class="gscroll">${s}</svg></div>`;
 }
 
-const PSCH=[['all','All'],['completed','Waiting for request'],['requested','Waiting for 👍'],['paid','Paid']];
-const STAGE={completed:['Waiting for request','w'],requested:['Waiting for 👍','a'],paid:['Paid','g']};
-function psTable(){
-  const D=psData(true);
-  const rows=D.rows,now=D.asOf,teams=D.teamsConnected;
-  $('#ps-chips').innerHTML=PSCH.map(([k,n])=>`<button type="button" class="chipf" data-k="${k}" aria-pressed="${psChip===k}">${n}<b>${fmtN(rows.filter(r=>k==='all'||r.stage===k).length)}</b></button>`).join('');
-  const list=rows.filter(r=>psChip==='all'||r.stage===psChip);
-  $('#ps-count').textContent=`${fmtN(list.length)} of ${fmtN(rows.length)} today · newest first`;
-  const head=`<thead><tr><th>Work order</th><th>Trade</th><th>Technician</th><th class="r">Amount</th><th>Completed</th><th>Request sent</th><th>Paid 👍</th><th class="r">Completed → request</th><th class="r">Request → paid</th><th class="r">Total</th><th>Status</th></tr></thead>`;
-  if(!list.length){$('#ps-table').innerHTML=head+'<tbody><tr><td colspan="11" class="empty">Nothing here yet today.</td></tr></tbody>';return;}
-  $('#ps-table').innerHTML=head+'<tbody>'+list.map(r=>{
-    const c2r=r.completedAt&&r.requestedAt?durCell(r.requestedAt-r.completedAt):r.completedAt&&teams?durCell(now-r.completedAt,1):'–';
-    const r2p=r.requestedAt?(r.processedAt?durCell(r.processedAt-r.requestedAt):durCell(now-r.requestedAt,1)):'–';
-    const tot=r.completedAt&&r.processedAt?durCell(r.processedAt-r.completedAt):'–';
-    const[st,cl]=!teams&&r.stage==='completed'?['Completed','n']:STAGE[r.stage]||[r.stage,'n'];
-    return `<tr><td><b>${esc(r.wo)}</b>${r.title?`<span class="l2 ttl" title="${esc(r.title)}">${esc(r.title)}</span>`:''}</td><td>${esc(r.trade||'–')}</td><td>${esc(r.tech||'–')}</td>
-      <td class="r">${r.amount==null?'–':usd2.format(r.amount)}</td><td>${r.completedAt?clk(r.completedAt):'–'}</td><td>${r.requestedAt?clk(r.requestedAt):'–'}</td><td>${r.processedAt?clk(r.processedAt):'–'}</td>
-      <td class="r">${c2r}</td><td class="r">${r2p}</td><td class="r">${tot}</td><td><span class="pill ${cl}">${st}</span></td></tr>`;
-  }).join('')+'</tbody>';
-}
-$('#ps-chips').addEventListener('click',e=>{const b=e.target.closest('.chipf');if(!b)return;psChip=b.dataset.k;psTable();});
 
 /* ══════════════════ SPEED HISTORY (simulated): filters, data slices, charts ══════════════════ */
 const F={P:30,trade:'',region:'',state:''};
@@ -1645,18 +1608,6 @@ function renderSpeedHistory(){
   const tr=TRADES.map(T=>{const rows=S.paid.filter(p=>p.wo.trade===T.name);return {n:T.name,c:rows.length,s:sum(rows,p=>p.paidAmount),m:median(rows.map(p=>p.ctp)),w:rows.filter(p=>p.ctp<=1).length/Math.max(1,rows.length),h:rows.filter(p=>p.flagged).length/Math.max(1,rows.length)};}).filter(x=>x.c).sort((a,b)=>b.c-a.c);
   $('#trades').innerHTML=`<thead><tr><th>Trade</th><th class="r">Payments</th><th class="r">Paid out</th><th class="r">Median</th><th class="r">Held</th><th class="r">Within 1 h</th></tr></thead><tbody>`+
     tr.map(x=>`<tr><td>${x.n}</td><td class="r">${fmtN(x.c)}</td><td class="r">${fmtK(x.s)}</td><td class="r">${fmtH(x.m)}</td><td class="r">${fmtP(x.h)}</td><td class="r">${(x.w*100).toFixed(1)}%<span class="mini"><i style="width:${x.w*100}%"></i></span></td></tr>`).join('')+'</tbody>';
-
-  // top technicians and technicians waiting longest
-  const tm=new Map();S.paid.forEach(p=>{let t=tm.get(p.wo.techId);if(!t){t={id:p.wo.techId,name:p.wo.tech,wos:new Set(),paid:0,held:0,ctp:[],trades:{}};tm.set(p.wo.techId,t);}t.wos.add(p.wo);t.paid+=p.paidAmount;t.ctp.push(p.ctp);if(p.flagged)t.held++;t.trades[p.wo.trade]=(t.trades[p.wo.trade]||0)+1;});
-  tm.forEach(t=>{t.med=median(t.ctp);t.max=Math.max(...t.ctp);t.in1=t.ctp.filter(x=>x<=1).length/t.ctp.length;});
-  const techRow=t=>{const tt=Object.entries(t.trades).sort((a,b)=>b[1]-a[1])[0][0];
-    return `<tr><td>${t.name} <span class="l2">#${String(t.id).padStart(4,'0')} · ${tt}</span></td><td class="r">${fmtN(t.wos.size)}</td><td class="r">${fmtN(t.ctp.length)}</td><td class="r">${fmtK(t.paid)}</td><td class="r">${waitCell(t.med)}</td><td class="r">${waitCell(t.max)}</td><td class="r">${miniBar(t.in1)}</td><td class="r">${t.held}</td></tr>`;};
-  const techHead=`<thead><tr><th>Technician</th><th class="r">Jobs</th><th class="r">Payments</th><th class="r">Paid</th><th class="r">Median wait</th><th class="r">Longest</th><th class="r">Within 1 h</th><th class="r">Held</th></tr></thead><tbody>`;
-  const none='<tr><td colspan="8" class="empty">No payments match these filters.</td></tr>';
-  const top=[...tm.values()].sort((a,b)=>b.paid-a.paid).slice(0,25);
-  $('#techs').innerHTML=techHead+(top.length?top.map(techRow).join(''):none)+'</tbody>';
-  const waiting=[...tm.values()].filter(t=>t.ctp.length>=3).sort((a,b)=>b.med-a.med).slice(0,10);
-  $('#techs-slow').innerHTML=techHead+(waiting.length?waiting.map(techRow).join(''):none)+'</tbody>';
 
   $('#f-note').innerHTML=`<b>${fmtN(c.cur.length)}</b> work orders · <b>${fmtN(c.pCur.length)}</b> payments in view`;
 }
