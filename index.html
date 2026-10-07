@@ -620,6 +620,19 @@ body[data-view="analytics"] .bar>.src{display:none}
   <!-- ═══════════════ ANALYTICS: pay speed today, real or simulated (same sections) ═══════════════ -->
   <section id="view-analytics" role="tabpanel" aria-labelledby="tab-analytics" hidden>
     <div class="goalbar" id="an-bar"></div>
+    <div class="filters" id="filters">
+      <div class="fgroup" id="fg-period">Period
+        <div class="seg" id="f-period" role="group" aria-label="Period">
+          <button type="button" data-p="7" aria-pressed="false">7 days</button>
+          <button type="button" data-p="30" aria-pressed="true">30 days</button>
+          <button type="button" data-p="90" aria-pressed="false">90 days</button>
+        </div>
+      </div>
+      <label class="fgroup" for="f-trade">Trade <select class="sel" id="f-trade"></select></label>
+      <label class="fgroup" id="fg-region" for="f-region">Region <select class="sel" id="f-region"></select></label>
+      <label class="fgroup" id="fg-state" for="f-state">State <select class="sel" id="f-state"></select></label>
+      <span class="fnote" id="f-note"></span>
+    </div>
     <div class="a-head">
       <div>
         <div class="range" id="ps-range"></div>
@@ -655,20 +668,6 @@ body[data-view="analytics"] .bar>.src{display:none}
     <h2 class="sec-h">Speed history and breakdowns</h2>
     <div class="panel hist-real" id="hist-real" hidden><p class="empty">Real data covers today only so far. Speed over 7, 30 and 90 days, and by state, trade, payment type and technician, fills in once real payments are saved day by day. Switch to <b>Demo</b> to see these dashboards with simulated data.</p></div>
     <div id="hist-demo" hidden>
-    <div class="filters" id="filters">
-      <div class="fgroup">Period
-        <div class="seg" id="f-period" role="group" aria-label="Period">
-          <button type="button" data-p="7" aria-pressed="false">7 days</button>
-          <button type="button" data-p="30" aria-pressed="true">30 days</button>
-          <button type="button" data-p="90" aria-pressed="false">90 days</button>
-        </div>
-      </div>
-      <label class="fgroup" for="f-trade">Trade <select class="sel" id="f-trade"></select></label>
-      <label class="fgroup" for="f-region">Region <select class="sel" id="f-region"></select></label>
-      <label class="fgroup" for="f-state">State <select class="sel" id="f-state"></select></label>
-      <span class="fnote" id="f-note"></span>
-    </div>
-
       <div class="a-head">
         <div>
           <div class="range" id="p-range"></div>
@@ -1199,21 +1198,28 @@ async function loadPS(force){
   try{
     const r=await fetch('/api/payspeed'+(force?'?refresh=1':''),{cache:'no-store'});
     const j=await r.json().catch(()=>null);
-    if(j&&j.ok){PS=j;psErr=j.stale?'ClickUp or Teams did not answer, showing the last good read':'';}
+    if(j&&j.ok){PS=j;if(view==='analytics')tradeOpts();psErr=j.stale?'ClickUp or Teams did not answer, showing the last good read':'';}
     else psErr=!j?'Pay speed data unreachable':j.reason==='locked'?'Real data is locked until a dashboard password is set'
       :j.reason==='not_configured'?'ClickUp is not connected yet':j.reason==='signed_out'?'Signed out. Reload the page to sign in again':'Error: '+(j.message||'unknown');
   }catch(e){console.error('Pay speed:',e);psErr='Pay speed data unreachable';}
   psBusy=false;psNextAt=Date.now()+PS_MS;if(MODE==='real')renderPS();
 }
-function psData(){return MODE==='real'?PS:demoPS();}
+// scoped: Analytics applies its trade / region / state filters; Live's overdue panel shows everything
+function psData(scoped){
+  const D=MODE==='real'?PS:demoPS();
+  if(!D||!scoped||!(F.trade||F.region||F.state))return D;
+  const rows=D.rows.filter(r=>(!F.trade||r.trade===F.trade)&&(!F.region||REGION_OF[r.state]===F.region)&&(!F.state||r.state===F.state));
+  return {...D,rows,summary:psSummary(rows,D.since,D.asOf),filtered:true};
+}
 
 /* Demo: a simulated day of SFM jobs in the same shape as /api/payspeed. The day's schedule is
    fixed per date; each render shows only what has happened by now, so jobs move from
    completed to requested to paid as the clock runs, and a few run late. */
 const DEMO_JOBS=[...JOBS.map(j=>[j.trade,j.title,j.billed]),['HVAC','Thermostat not responding',420],['Plumbing','Toilet running nonstop',310],
   ['Electrical','Outlet sparking in break room',360],['Handyman','Ceiling tile water stain',260],['Refrigeration','Ice machine not making ice',540],
-  ['Plumbing','Water heater pilot out',480],['HVAC','Noisy blower motor',590],['Doors','Overhead door off track',650],['Electrical','Parking lot pole light out',720]];
+  ['Plumbing','Water heater pilot out',480],['HVAC','Noisy blower motor',590],['Roofing','Roof leak over the stockroom',900],['Locksmith','Back door lock jammed',260],['Electrical','Parking lot pole light out',720]];
 let demoDay=null;
+const DEMO_STATES=[...new Set(CITIES.map(c=>c.slice(-2)))];
 function demoSchedule(){
   const d=new Date(),key=d.toDateString();if(demoDay?.key===key)return demoDay;
   const mid=new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime(),H=3600000,M=60000;
@@ -1223,7 +1229,7 @@ function demoSchedule(){
   while(t<end){
     const [trade,title,billed]=DEMO_JOBS[Math.floor(R()*DEMO_JOBS.length)];
     const req=t+wait([3,18],[18,55],[60,140]),paid=req+wait([2,22],[22,65],[65,170]);
-    jobs.push({wo:'WO-'+(71240+n*17),title,trade,tech:FIRST[Math.floor(R()*FIRST.length)]+' '+LASTI[Math.floor(R()*LASTI.length)]+'.',
+    jobs.push({wo:'WO-'+(71240+n*17),title,trade,state:DEMO_STATES[Math.floor(R()*DEMO_STATES.length)],tech:FIRST[Math.floor(R()*FIRST.length)]+' '+LASTI[Math.floor(R()*LASTI.length)]+'.',
       amount:r5(billed*(.55+R()*.2)),completedAt:t,req,paid});
     t+=(6+R()*12)*M;n++;
   }
@@ -1237,17 +1243,21 @@ function demoPS(){
   const now=Date.now(),{since,jobs}=demoSchedule();
   const rows=jobs.filter(j=>j.completedAt<=now).map(j=>{
     const requestedAt=j.req<=now?j.req:null,processedAt=requestedAt&&j.paid<=now?j.paid:null;
-    return {wo:j.wo,title:j.title,trade:j.trade,tech:requestedAt?j.tech:'',amount:requestedAt?j.amount:null,completedAt:j.completedAt,requestedAt,processedAt,
+    return {wo:j.wo,title:j.title,trade:j.trade,state:j.state,tech:requestedAt?j.tech:'',amount:requestedAt?j.amount:null,completedAt:j.completedAt,requestedAt,processedAt,
       stage:processedAt?'paid':requestedAt?'requested':'completed'};
   });
   const last=r=>Math.max(r.completedAt??0,r.requestedAt??0,r.processedAt??0);rows.sort((a,b)=>last(b)-last(a));
+  return {ok:true,demo:true,asOf:now,since,teamsConnected:true,rows,warnings:[],summary:psSummary(rows,since,now)};
+}
+// same numbers /api/payspeed returns, from any set of rows (used for the demo and for filtered views)
+function psSummary(rows,since,now){
   const pay=rows.filter(r=>r.requestedAt&&r.amount>0),wReq=rows.filter(r=>r.stage==='completed'),wPay=pay.filter(r=>!r.processedAt);
-  return {ok:true,demo:true,asOf:now,since,teamsConnected:true,rows,warnings:[],summary:{
-    completed:rows.length,requested:pay.length,paid:pay.filter(r=>r.processedAt).length,
+  return {
+    completed:rows.filter(r=>r.completedAt).length,requested:pay.filter(r=>r.requestedAt>=since).length,paid:pay.filter(r=>r.processedAt>=since).length,
     awaitingRequest:wReq.length,awaitingPayment:wPay.length,
     oldestAwaitingRequest:Math.max(0,...wReq.map(r=>now-r.completedAt))||null,oldestAwaitingPayment:Math.max(0,...wPay.map(r=>now-r.requestedAt))||null,
-    completeToRequest:psStats(pay.map(r=>r.requestedAt-r.completedAt)),requestToPaid:psStats(pay.filter(r=>r.processedAt).map(r=>r.processedAt-r.requestedAt)),
-    completeToPaid:psStats(pay.filter(r=>r.processedAt).map(r=>r.processedAt-r.completedAt))}};
+    completeToRequest:psStats(pay.filter(r=>r.completedAt).map(r=>r.requestedAt-r.completedAt)),requestToPaid:psStats(pay.filter(r=>r.processedAt).map(r=>r.processedAt-r.requestedAt)),
+    completeToPaid:psStats(pay.filter(r=>r.processedAt&&r.completedAt).map(r=>r.processedAt-r.completedAt))};
 }
 function psUpd(){const secs=Math.max(0,Math.ceil((psNextAt-Date.now())/1000));return psBusy?'Refreshing…':PS?`Updated ${clk(PS.asOf)} · next in ${secs}s`:(psErr?'':'Connecting…');}
 function psStatus(){if(MODE!=='real'){$('#ps-status').innerHTML='<span class="sim-chip" title="Modeled data for demonstration">Simulated data</span>';return;}$('#ps-status').innerHTML=`<span class="upd">${psUpd()}</span><button type="button" class="btn" id="ps-refresh"${psBusy?' disabled':''}>Refresh</button>`;}
@@ -1262,7 +1272,7 @@ setInterval(()=>{
 
 function renderPS(){
   psStatus();
-  const D=psData();
+  const D=psData(true);
   const notes=[...(MODE==='real'&&psErr?[psErr]:[]),...(D?.warnings||[])];
   $('#ps-notice').hidden=!notes.length;$('#ps-notice').innerHTML=notes.map(t=>`<div>${ic('alert')}${esc(t)}</div>`).join('');
   if(!D){
@@ -1313,7 +1323,7 @@ const OD_T=[[30,'30 min'],[60,'1 h'],[120,'2 h']];
 let odMin=60;try{const v=+localStorage.getItem('overdueMin');if(OD_T.some(t=>t[0]===v))odMin=v;}catch{}
 function psOverdue(){odRender('ps-od');odRender('lv-od');}
 function odRender(P){
-  const D=psData();
+  const D=psData(P==='ps-od');
   $(`#${P}-t`).innerHTML=OD_T.map(([v,n])=>`<button type="button" data-t="${v}" aria-pressed="${v===odMin}">${n}</button>`).join('');
   if(!D)return;
   const now=Date.now(),T=odMin*60000,teams=D.teamsConnected;
@@ -1368,7 +1378,7 @@ function psGantt(el,rows,now,since){
 const PSCH=[['all','All'],['completed','Waiting for request'],['requested','Waiting for 👍'],['paid','Paid']];
 const STAGE={completed:['Waiting for request','w'],requested:['Waiting for 👍','a'],paid:['Paid','g']};
 function psTable(){
-  const D=psData();
+  const D=psData(true);
   const rows=D.rows,now=D.asOf,teams=D.teamsConnected;
   $('#ps-chips').innerHTML=PSCH.map(([k,n])=>`<button type="button" class="chipf" data-k="${k}" aria-pressed="${psChip===k}">${n}<b>${fmtN(rows.filter(r=>k==='all'||r.stage===k).length)}</b></button>`).join('');
   const list=rows.filter(r=>psChip==='all'||r.stage===psChip);
@@ -1390,7 +1400,15 @@ $('#ps-chips').addEventListener('click',e=>{const b=e.target.closest('.chipf');i
 /* ══════════════════ SPEED HISTORY (simulated): filters, data slices, charts ══════════════════ */
 const F={P:30,trade:'',region:'',state:''};
 function opts(el,label,list){el.innerHTML=`<option value="">${label}</option>`+list.map(x=>`<option>${esc(x)}</option>`).join('');}
-opts($('#f-trade'),'All trades',TRADES.map(t=>t.name));
+// real trades come from ClickUp, so the list follows whatever data is showing
+let tradeList='';
+function tradeOpts(){
+  const list=MODE==='real'?[...new Set((PS?.rows||[]).map(r=>r.trade).filter(Boolean))].sort():TRADES.map(t=>t.name);
+  if(list.join('|')===tradeList)return;tradeList=list.join('|');
+  if(F.trade&&!list.includes(F.trade)){F.trade='';CTX=null;}
+  opts($('#f-trade'),'All trades',list);$('#f-trade').value=F.trade;
+}
+opts($('#f-trade'),'All trades',TRADES.map(t=>t.name)); // tradeOpts() takes over once the page is running
 opts($('#f-region'),'All regions',Object.keys(REGIONS));
 // State list follows the chosen region
 function stateOpts(){
@@ -1640,9 +1658,13 @@ function renderView(){
   const demo=MODE!=='real';
   $('#an-bar').innerHTML=`<span class="gl">${demo?'Demo · simulated payments':'Real data · today'}</span>
     <div class="seg" role="group" aria-label="Data"><button type="button" data-m="real" aria-pressed="${!demo}">Real data</button><button type="button" data-m="demo" aria-pressed="${demo}">Demo</button></div>`;
+  tradeOpts();
+  ['#fg-period','#fg-region','#fg-state'].forEach(id=>$(id).hidden=!demo); // real data has no location or history yet
+  if(!demo&&(F.region||F.state)){F.region=F.state='';$('#f-region').value='';stateOpts();CTX=null;}
   if(!demo&&!PS&&!psErr&&!psBusy)loadPS(false);else renderPS();
   $('#hist-real').hidden=demo;$('#hist-demo').hidden=!demo;
   if(demo)renderSpeedHistory();
+  else{const D=psData(true);$('#f-note').innerHTML=D?`<b>${fmtN(D.rows.length)}</b> of ${fmtN(PS.rows.length)} jobs today`:'';}
 }
 $('#an-bar').addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b)return;const v=b.dataset.m==='real'?'real':'demo';if(v!==MODE)setMode(v);});
 
@@ -1662,7 +1684,7 @@ function select(which){
 }
 VIEWS.forEach(v=>$('#tab-'+v).addEventListener('click',()=>select(v)));
 document.querySelector('.tabs').addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;const i=VIEWS.indexOf(view),n=VIEWS[(i+(e.key==='ArrowRight'?1:VIEWS.length-1))%VIEWS.length];select(n);$('#tab-'+n).focus();});
-let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(view!=='analytics')return;const D=psData();if(D)psGantt($('#ps-gantt'),D.rows,D.asOf,D.since);if(MODE!=='real')renderSpeedHistory();},120);});
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(view!=='analytics')return;const D=psData(true);if(D)psGantt($('#ps-gantt'),D.rows,D.asOf,D.since);if(MODE!=='real')renderSpeedHistory();},120);});
 
 /* ══════════════════ REAL DATA: ClickUp jobs on the Live page ══════════════════
    /api/live returns today's work orders that reached Done/Incurred. The page reads it
