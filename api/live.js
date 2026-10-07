@@ -16,6 +16,7 @@
  *   CLICKUP_FIELD_TRADE  custom field holding the trade (default "Trade")
  *   CLICKUP_FIELD_FM     custom field holding the client / FM (default "FM")
  *   CLICKUP_FIELD_COST   custom field holding the cost (default "Cost")
+ *   CLICKUP_FIELD_DESCRIPTION  field the job title is written from (default "WO Description", else the task description)
  *   APP_TZ               time zone that defines "today" (default America/New_York)
  *   ANTHROPIC_API_KEY    optional; turns descriptions into short job titles
  *   DASHBOARD_PASSWORD   required before any real data is served (see middleware.js)
@@ -209,7 +210,7 @@ async function build() {
   const tz = env("APP_TZ", "America/New_York");
   const since = startOfToday(tz);
   const doneStatus = letters(env("CLICKUP_DONE_STATUS", "done/incurred"));
-  const names = { trade: env("CLICKUP_FIELD_TRADE", "Trade"), fm: env("CLICKUP_FIELD_FM", "FM"), cost: env("CLICKUP_FIELD_COST", "Cost") };
+  const names = { trade: env("CLICKUP_FIELD_TRADE", "Trade"), fm: env("CLICKUP_FIELD_FM", "FM"), cost: env("CLICKUP_FIELD_COST", "Cost"), desc: env("CLICKUP_FIELD_DESCRIPTION", "WO Description") };
 
   const updated = await allTasksUpdatedSince(since);
   const done = updated.filter((t) => letters(t.status?.status) === doneStatus);
@@ -224,7 +225,7 @@ async function build() {
   const today = withTimes.filter(([, ms]) => ms >= since);
 
   // Titles: cached per description; new ones go to Claude in one batch.
-  const descOf = (t) => safeDescription(t.text_content ?? t.description ?? "").slice(0, 6000); // titles only need the opening of long descriptions
+  const descOf = (t) => safeDescription(fieldText(field(t, names.desc)) || t.text_content || t.description || "").slice(0, 6000); // titles only need the opening of long descriptions
   const keyOf = (t) => t.id + ":" + hash(descOf(t));
   const missing = today.filter(([t]) => !titleCache.has(keyOf(t)) && descOf(t)).map(([t]) => ({ id: t.id, description: descOf(t) }));
   const fresh = await aiTitles(missing);
