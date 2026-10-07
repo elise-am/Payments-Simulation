@@ -274,21 +274,26 @@ async function build() {
   return { ok: true, source: "clickup", asOf: Date.now(), tz, since, space: scope?.spaceNames ?? scope?.spaceIds, jobs, warnings, fieldsSeen: [...seen].sort(), statusesSeen, tasksReadToday: updated.length };
 }
 
-export async function GET(request) {
-  const json = (body, status = 200) => Response.json(body, { status, headers: { "cache-control": "private, no-store" } });
-  if (!env("DASHBOARD_PASSWORD")) return json({ ok: false, reason: "locked", message: "Set DASHBOARD_PASSWORD before the dashboard serves real data." });
+/** Today's ClickUp jobs, cached 45 s per warm instance. Also used by /api/payspeed. */
+export async function liveJobs(force = false) {
+  if (!env("DASHBOARD_PASSWORD")) return { ok: false, reason: "locked", message: "Set DASHBOARD_PASSWORD before the dashboard serves real data." };
   const missing = ["CLICKUP_TOKEN"].filter((k) => !env(k));
-  if (missing.length) return json({ ok: false, reason: "not_configured", missing });
+  if (missing.length) return { ok: false, reason: "not_configured", missing };
 
-  const force = new URL(request.url).searchParams.get("refresh") === "1";
   const age = Date.now() - lastAt;
-  if (lastResult && (age < 5000 || (!force && age < 45000))) return json({ ...lastResult, cached: true });
+  if (lastResult && (age < 5000 || (!force && age < 45000))) return { ...lastResult, cached: true };
   try {
     lastResult = await build();
     lastAt = Date.now();
-    return json(lastResult);
+    return lastResult;
   } catch (err) {
-    if (lastResult) return json({ ...lastResult, cached: true, stale: true, error: String(err?.message ?? err) });
-    return json({ ok: false, reason: "error", message: String(err?.message ?? err) }, 502);
+    if (lastResult) return { ...lastResult, cached: true, stale: true, error: String(err?.message ?? err) };
+    return { ok: false, reason: "error", message: String(err?.message ?? err), status: 502 };
   }
+}
+
+export async function GET(request) {
+  const body = await liveJobs(new URL(request.url).searchParams.get("refresh") === "1");
+  const { status = 200, ...rest } = body;
+  return Response.json(rest, { status, headers: { "cache-control": "private, no-store" } });
 }
