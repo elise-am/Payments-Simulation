@@ -1531,11 +1531,11 @@ $('#goalbar').addEventListener('click',e=>{const b=e.target.closest('[data-g]');
 function realKpis(jobs){
   const x=goalOn?GOAL_X:1,withCost=jobs.filter(j=>j.cost!=null),cost=sum(withCost,j=>j.cost);
   const note=v=>goalOn?`Actual ${v} · shown ×${GOAL_X}`:'';
-  return [['Work orders completed',fmtN(jobs.length*x),goalOn?note(fmtN(jobs.length)):'Moved to Done/Incurred today'],
-    ['Jobs with technician paid','–','Fills in from Teams payment messages'],
-    ['Payments released','–','Fills in from Teams payment messages'],
-    ['Technician cost today',withCost.length?fmtK(cost*x):'–',goalOn&&withCost.length?note(fmtK(cost)):`${withCost.length} of ${jobs.length} jobs have a cost`]]
-    .map(([l,v,s],n)=>`<div class="kpi${n===0?' hero':''}"><span class="lbl">${l}${goalOn&&v!=='–'?' <span class="gx">×'+GOAL_X+'</span>':''}</span><span class="val num">${v}</span><span class="sub">${s}</span></div>`).join('');
+  return [['Work orders completed',fmtN(jobs.length*x),goalOn?note(fmtN(jobs.length)):''],
+    ['Jobs with technician paid','–',''],
+    ['Payments released','–',''],
+    ['Average technician cost',withCost.length?fmt$(cost/withCost.length):'–',withCost.length?`Per job · ${withCost.length} of ${jobs.length} jobs have a cost`:'No costs entered yet']]
+    .map(([l,v,s],n)=>`<div class="kpi${n===0?' hero':''}"><span class="lbl">${l}${goalOn&&n===0&&v!=='–'?' <span class="gx">×'+GOAL_X+'</span>':''}</span><span class="val num">${v}</span><span class="sub">${s}</span></div>`).join('');
 }
 function renderReal(){
   if(MODE!=='real'||!REAL)return;
