@@ -1,0 +1,1485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Simulated Seamless FM dashboard: live payout journey, business margins, payment speed and work-order ledger.">
+<title>Seamless Payouts &amp; Margins</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700;800&display=swap">
+<style>
+/* Layout: one work order's journey as the hero (department bands over eight checkpoints,
+   a "now happening" stage beneath), the technician's phone beside it, then ambient volume
+   below. Dark-first ("Blackout"), light = "Daylight Dispatch". */
+:root{
+  color-scheme:dark;
+  --bg:#050505; --surface:#0c0d0e; --surface-2:#141619;
+  --border:rgba(255,255,255,.09); --border-strong:rgba(255,255,255,.16);
+  --grid:rgba(255,255,255,.06);
+  --ink:#f2f3f5; --ink-2:#9aa0ab; --ink-3:#80848d;
+  --accent:#35b8f3; --accent-fill:#35b8f3; --accent-soft:rgba(53,184,243,.14); --on-accent:#00121c;
+  --good:#3ddc97; --good-fill:#3ddc97; --good-soft:rgba(61,220,151,.13); --on-good:#03150c;
+  --warn:#f8ae00; --warn-fill:#f8ae00; --warn-soft:rgba(248,174,0,.13);
+  --danger:#ff6b6a; --danger-fill:#ff6b6a; --danger-soft:rgba(255,107,106,.12);
+  --track:rgba(255,255,255,.12);
+  --glow:rgba(53,184,243,.10);
+  --phone:#000; --phone-edge:#2a2d31;
+  --font-body:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-num:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+  --radius:6px;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme:light;
+    --bg:#f2f4f6; --surface:#ffffff; --surface-2:#f1f3f6;
+    --border:#e3e6ea; --border-strong:#d4d9df; --grid:#edf0f3;
+    --ink:#191c21; --ink-2:#555c68; --ink-3:#6c727b;
+    --accent:#0d6e97; --accent-fill:#1a9fd4; --accent-soft:#e5f5fd; --on-accent:#ffffff;
+    --good:#13804f; --good-fill:#1fa86a; --good-soft:#e3f6ec; --on-good:#ffffff;
+    --warn:#7c5700; --warn-fill:#d98c00; --warn-soft:#fdf3e0;
+    --danger:#c92a29; --danger-fill:#d93b3a; --danger-soft:#fdecec;
+    --track:#dde2e7; --glow:rgba(26,159,212,.08);
+    --phone:#ffffff; --phone-edge:#cfd5dc;
+  }
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f2f4f6; --surface:#ffffff; --surface-2:#f1f3f6;
+  --border:#e3e6ea; --border-strong:#d4d9df; --grid:#edf0f3;
+  --ink:#191c21; --ink-2:#555c68; --ink-3:#6c727b;
+  --accent:#0d6e97; --accent-fill:#1a9fd4; --accent-soft:#e5f5fd; --on-accent:#ffffff;
+  --good:#13804f; --good-fill:#1fa86a; --good-soft:#e3f6ec; --on-good:#ffffff;
+  --warn:#7c5700; --warn-fill:#d98c00; --warn-soft:#fdf3e0;
+  --danger:#c92a29; --danger-fill:#d93b3a; --danger-soft:#fdecec;
+  --track:#dde2e7; --glow:rgba(26,159,212,.08);
+  --phone:#ffffff; --phone-edge:#cfd5dc;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+img{max-width:100%}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.45}
+.wrap{max-width:1320px;margin:0 auto;padding-inline:20px;padding-block:0 28px}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+svg.i{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── Top bar ── */
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:14px 24px;padding-block:18px 16px;border-bottom:1px solid var(--border);margin-bottom:18px}
+.brand{display:flex;flex-direction:column;gap:1px;min-width:0}
+.brand .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700}
+.brand h1{margin:0;font-family:var(--font-num);font-weight:700;font-size:26px;letter-spacing:.01em;line-height:1.1}
+.tabs{display:flex;gap:2px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:3px}
+.tab{appearance:none;border:0;background:transparent;color:var(--ink-2);font:600 13px var(--font-body);padding:7px 14px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:8px}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{background:var(--accent-soft);color:var(--accent)}
+.tab:focus-visible,.btn:focus-visible{outline:2px solid var(--accent-fill);outline-offset:2px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--good-fill)}
+.bar .spacer{flex:1}
+.sim-chip{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);border:1px dashed var(--border-strong);border-radius:3px;padding:3px 7px}
+.btn{appearance:none;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink);font:600 12px var(--font-body);padding:6px 12px;border-radius:var(--radius);cursor:pointer}
+.btn:hover{border-color:var(--accent-fill)}
+
+/* ── Story layout ── */
+.story{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;margin-bottom:18px}
+.main{position:relative;background:radial-gradient(120% 80% at 50% 0%,var(--glow),transparent 60%),var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;min-width:0;transition:opacity .4s}
+.main.fade{opacity:0}
+#confetti{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
+
+.wo{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:14px 24px;padding:20px 24px 6px}
+.wo .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-weight:700;display:flex;align-items:center;gap:8px}
+.wo h2{margin:4px 0 4px;font-family:var(--font-num);font-weight:700;font-size:clamp(24px,2.6vw,32px);line-height:1.1;text-wrap:balance}
+.wo .meta{color:var(--ink-2);font-size:13.5px}
+.wo .meta b{color:var(--ink);font-weight:600}
+.timer{text-align:right;min-width:150px}
+.timer .lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
+.timer .v{font-family:var(--font-num);font-weight:700;font-size:44px;line-height:1;font-variant-numeric:tabular-nums;transition:color .4s}
+.timer .v small{font-size:22px;color:var(--ink-2);font-weight:600;margin:0 4px 0 1px}
+.timer.paid .v{color:var(--good)}
+.timer .s{font-size:12px;color:var(--ink-3)}
+.ctl{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+
+/* journey */
+.journey{position:relative;padding:18px 24px 6px}
+.bands{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;margin-bottom:16px}
+.band{grid-column:span var(--span);text-align:center;font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--ink-3);padding:0 0 7px;border-bottom:2px solid var(--border);transition:color .4s,border-color .4s}
+.band.on{color:var(--accent);border-color:var(--accent-fill)}
+.band.ok{color:var(--good);border-color:var(--good-fill)}
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));position:relative}
+.rail{position:absolute;left:calc(100% / 16);right:calc(100% / 16);top:26px;height:4px;background:var(--track);border-radius:2px}
+.rail .fill{position:absolute;left:0;top:0;bottom:0;width:calc(var(--p,0) * 100%);background:linear-gradient(90deg,var(--good-fill),var(--accent-fill));border-radius:2px}
+.rail .fill::after{content:'';position:absolute;right:-7px;top:50%;width:14px;height:14px;margin-top:-7px;border-radius:50%;background:var(--accent-fill);box-shadow:0 0 0 5px var(--accent-soft),0 0 18px var(--accent-fill)}
+.journey.complete .rail .fill::after{background:var(--good-fill);box-shadow:0 0 0 5px var(--good-soft),0 0 18px var(--good-fill)}
+.step{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;position:relative;z-index:1;min-width:0;padding:0 3px}
+.node{position:relative;width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:var(--surface);border:2px solid var(--border-strong);color:var(--ink-3);transition:background .35s,border-color .35s,color .35s,box-shadow .35s,transform .35s}
+.step.active .node{border-color:var(--accent-fill);color:var(--accent);box-shadow:0 0 0 6px var(--accent-soft);transform:scale(1.08)}
+.step.done .node{background:var(--good-fill);border-color:var(--good-fill);color:var(--on-good)}
+.step.hold .node{border-color:var(--warn-fill);color:var(--warn);box-shadow:0 0 0 6px var(--warn-soft)}
+.node .tick{position:absolute;right:-3px;bottom:-3px;width:20px;height:20px;border-radius:50%;background:var(--surface);color:var(--good);display:grid;place-items:center;border:2px solid var(--good-fill);transform:scale(0);transition:transform .3s cubic-bezier(.3,1.6,.5,1)}
+.node .tick svg{width:12px;height:12px;stroke-width:3}
+.step.done .tick{transform:scale(1)}
+.step .txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.step .lab{font-size:12.5px;font-weight:600;color:var(--ink-3);line-height:1.25;transition:color .3s}
+.step.active .lab,.step.done .lab{color:var(--ink)}
+.step .when{font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;min-height:1.2em}
+.step .dept-m{display:none}
+
+/* now-happening stage */
+.now{margin:14px 24px 22px;padding:20px 22px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);min-height:258px}
+.now.enter{animation:rise .45s ease-out}
+.now-h{display:flex;flex-direction:column;gap:2px;margin-bottom:14px}
+.now-h .d{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:700}
+.now-h h3{margin:0;font-family:var(--font-num);font-weight:700;font-size:26px;line-height:1.15}
+.now-h p{margin:0;color:var(--ink-2)}
+.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.checks li{display:flex;align-items:center;gap:10px;font-size:15px;opacity:.25;transition:opacity .3s}
+.checks li.on{opacity:1}
+.cb{width:22px;height:22px;border-radius:5px;border:2px solid var(--border-strong);display:grid;place-items:center;color:var(--on-good);transition:background .25s,border-color .25s}
+.cb svg{width:14px;height:14px;stroke-width:3;opacity:0}
+.checks li.on .cb{background:var(--good-fill);border-color:var(--good-fill)}
+.checks li.on .cb svg{opacity:1}
+
+.sig{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:flex-end}
+.pad{position:relative;width:min(100%,380px);height:130px;border-radius:6px;background:var(--surface);border:1px solid var(--border)}
+.pad::after{content:'';position:absolute;left:22px;right:22px;bottom:30px;border-bottom:1px dashed var(--border-strong)}
+.pad .x{position:absolute;left:12px;bottom:34px;color:var(--ink-3);font-size:14px}
+.pad svg{position:absolute;inset:6px 16px 26px 30px;width:calc(100% - 46px);height:calc(100% - 32px);overflow:visible}
+.pad path{fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1}
+.pad.draw path{animation:sign 2.1s ease-in-out forwards}
+.signed{opacity:0;transition:opacity .4s;font-size:14px;color:var(--ink-2)}
+.signed.on{opacity:1}
+.signed b{color:var(--ink);display:block;font-size:16px}
+
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;max-width:560px}
+.tile{position:relative;aspect-ratio:4/3;max-width:100%;border-radius:6px;overflow:hidden;color:#fff;display:flex;align-items:flex-end;padding:8px;font-size:12px;font-weight:600;opacity:0;transform:scale(.85);transition:opacity .3s,transform .35s cubic-bezier(.3,1.5,.5,1)}
+.tile.on{opacity:1;transform:none}
+.tile .ph{position:absolute;inset:0}
+.tile span{position:relative;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.tile .cam{position:absolute;top:8px;left:8px;width:18px;height:18px;opacity:.75}
+.tile .badge{position:absolute;top:7px;right:7px;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;transform:scale(0);transition:transform .3s cubic-bezier(.3,1.6,.5,1)}
+.tile .badge svg{width:14px;height:14px;stroke-width:3}
+.tile.ok .badge{transform:scale(1);background:#1fa86a;color:#fff}
+.tile.bad .badge{transform:scale(1);background:#d98c00;color:#fff}
+.tile.bad{outline:3px solid var(--warn-fill);outline-offset:2px}
+.tile.blur .ph{filter:blur(3px)}
+.flagnote{margin-top:12px;display:none;align-items:center;gap:8px;padding:8px 12px;border-radius:5px;background:var(--warn-soft);color:var(--warn);font-weight:600;font-size:13px;width:fit-content;max-width:100%}
+.flagnote.on{display:flex}
+.reviewer{margin-top:14px;font-size:13.5px;color:var(--ink-2)}
+.reviewer b{color:var(--ink)}
+.allok{margin-top:12px;display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:5px;background:var(--good-soft);color:var(--good);font-weight:700;opacity:0;transition:opacity .3s}
+.allok.on{opacity:1}
+
+.release{display:flex;flex-wrap:wrap;align-items:center;gap:18px 26px}
+.rbtn{display:inline-flex;align-items:center;gap:10px;padding:16px 22px;border-radius:8px;background:var(--accent-fill);color:var(--on-accent);font-weight:700;font-size:16px;transition:transform .15s,background .3s,box-shadow .3s;box-shadow:0 6px 20px var(--accent-soft)}
+.rbtn.press{transform:scale(.94)}
+.rbtn.done{background:var(--good-fill);color:var(--on-good);box-shadow:0 6px 20px var(--good-soft)}
+.handoff{display:flex;align-items:center;gap:12px;color:var(--ink-3);font-weight:600;opacity:.3;transition:opacity .4s,color .4s}
+.handoff.on{opacity:1;color:var(--ink)}
+.handoff .arrow{width:90px;height:4px;border-radius:2px;background:var(--track);position:relative;overflow:hidden}
+.handoff .arrow i{position:absolute;inset:0;background:var(--accent-fill);transform:translateX(-100%);transition:transform .9s ease-out}
+.handoff.on .arrow i{transform:none}
+
+.amount{font-family:var(--font-num);font-weight:800;font-size:clamp(46px,6vw,64px);line-height:1;font-variant-numeric:tabular-nums}
+.facts{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:12px;font-size:13.5px;color:var(--ink-2)}
+.facts b{color:var(--ink);font-weight:600}
+.stamp{display:inline-flex;align-items:center;gap:8px;margin-top:14px;padding:6px 12px;border:2px solid var(--good-fill);color:var(--good);border-radius:5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;font-size:13px;transform:rotate(-4deg) scale(1.6);opacity:0;transition:transform .35s cubic-bezier(.3,1.5,.5,1),opacity .2s}
+.stamp.on{transform:rotate(-4deg) scale(1);opacity:1}
+
+.bankbox{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.vault{width:96px;height:96px;border-radius:50%;display:grid;place-items:center;border:3px solid var(--border-strong);color:var(--ink-3);position:relative;transition:border-color .4s,color .4s,background .4s}
+.vault svg{width:40px;height:40px}
+.vault .spin{position:absolute;inset:-3px;border-radius:50%;border:3px solid transparent;border-top-color:var(--accent-fill)}
+.vault.ok{border-color:var(--good-fill);color:var(--on-good);background:var(--good-fill)}
+.vault.ok .spin{display:none}
+.bankmsg b{display:block;font-family:var(--font-num);font-size:24px;font-weight:700}
+.bankmsg span{color:var(--ink-2)}
+
+.paid-h{font-family:var(--font-num);font-weight:800;font-size:clamp(34px,4.4vw,52px);line-height:1.02;margin:0;text-wrap:balance}
+.paid-h em{font-style:normal;color:var(--good)}
+.paid-sub{margin:8px 0 18px;color:var(--ink-2);font-size:15px}
+.paid-sub b{color:var(--ink)}
+.happy{display:flex;flex-wrap:wrap;gap:10px}
+.happy span{display:inline-flex;align-items:center;gap:8px;padding:7px 12px 7px 8px;border-radius:999px;background:var(--good-soft);color:var(--good);font-weight:700;font-size:13px;opacity:0;transform:translateY(8px);transition:opacity .3s,transform .3s}
+.happy span.on{opacity:1;transform:none}
+.happy i{width:20px;height:20px;border-radius:50%;background:var(--good-fill);color:var(--on-good);display:grid;place-items:center}
+.happy i svg{width:12px;height:12px;stroke-width:3}
+
+/* phone */
+.phone{align-self:start;position:sticky;top:14px;background:var(--phone);border:10px solid var(--phone-edge);border-radius:38px;height:620px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.ph-top{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 14px 12px;border-bottom:1px solid var(--border)}
+.notch{width:90px;height:20px;border-radius:12px;background:var(--phone-edge);margin-bottom:4px}
+.ava{width:40px;height:40px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700}
+.ph-top b{font-size:13.5px}
+.ph-top span{font-size:11.5px;color:var(--ink-3)}
+.msgs{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:12px;overflow:hidden}
+.m{max-width:84%;padding:8px 11px;border-radius:16px;font-size:13px;line-height:1.35}
+.m.in{align-self:flex-start;background:var(--surface-2);border:1px solid var(--border);border-bottom-left-radius:5px}
+.m.out{align-self:flex-end;background:var(--accent-fill);color:var(--on-accent);border-bottom-right-radius:5px}
+.m.pics{display:grid;grid-template-columns:repeat(2,40px);gap:4px;padding:5px}
+.m.pics div{width:40px;height:30px;border-radius:4px}
+.m.dep{align-self:stretch;max-width:100%;border-radius:12px;background:var(--good-soft);border:1.5px solid var(--good-fill);padding:12px}
+.m.dep .k{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--good)}
+.m.dep .a{font-family:var(--font-num);font-weight:800;font-size:34px;line-height:1.1;color:var(--ink)}
+.m.dep .f{font-size:12px;color:var(--ink-2)}
+.m.enter{animation:pop .35s cubic-bezier(.3,1.4,.5,1)}
+.typing{align-self:flex-start;display:none;gap:4px;padding:10px 12px;border-radius:16px;background:var(--surface-2);border:1px solid var(--border)}
+.typing.on{display:flex}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--ink-3)}
+
+/* ambient volume */
+.below{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);min-width:0}
+.panel-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)}
+.panel-h h2{margin:0;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.panel-h .meta{font-size:12px;color:var(--ink-3)}
+.flows{list-style:none;margin:0;padding:6px 0}
+.flow{display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr) minmax(0,150px);gap:14px;align-items:center;padding:9px 16px;border-bottom:1px solid var(--grid)}
+.flow:last-child{border-bottom:0}
+.flow .who b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flow .who span{font-size:12px;color:var(--ink-3)}
+.dots{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}
+.dots i{height:6px;border-radius:3px;background:var(--track);transition:background .4s}
+.dots i.d{background:var(--good-fill)}
+.dots i.a{background:var(--accent-fill)}
+.flow .st{font-size:12.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flow.just{animation:flash 1s ease-out}
+.wall{display:flex;flex-wrap:wrap;gap:8px;padding:14px 16px}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);font-size:13px}
+.chip i{width:22px;height:22px;border-radius:50%;background:var(--good-fill);color:var(--on-good);display:grid;place-items:center}
+.chip i svg{width:12px;height:12px;stroke-width:3}
+.chip span{color:var(--ink-3)}
+.chip.enter{animation:pop .4s cubic-bezier(.3,1.4,.5,1)}
+
+/* ── Analytics (static) ── */
+.a-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;margin-bottom:16px}
+.a-head .range{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
+.headline{margin:4px 0 0;font-family:var(--font-num);font-weight:600;font-size:clamp(24px,3.2vw,36px);line-height:1.12;max-width:30ch;text-wrap:balance}
+.headline em{font-style:normal;color:var(--good)}
+.compare{display:flex;flex-direction:column;gap:8px;min-width:min(100%,320px)}
+.cmp-row{display:grid;grid-template-columns:96px minmax(0,1fr) 64px;align-items:center;gap:10px;font-size:12px;color:var(--ink-2)}
+.cmp-row .b{height:10px;border-radius:2px;background:var(--accent-fill)}
+.cmp-row.ours .b{background:var(--good-fill)}
+.cmp-row .v{font-family:var(--font-num);font-weight:700;font-size:15px;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px}
+.kpi{background:var(--surface);padding:14px 16px 12px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
+.kpi .val{font-family:var(--font-num);font-weight:700;font-size:34px;line-height:1.05;font-variant-numeric:tabular-nums}
+.kpi .val small{font-size:18px;font-weight:600;color:var(--ink-2);margin-left:2px}
+.kpi .sub{font-size:12px;color:var(--ink-3)}
+.kpi.hero .val{color:var(--good)}
+.grid2{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px;margin-bottom:16px}
+.grid2.even{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.chart{padding:10px 12px 8px}
+.chart svg{display:block;width:100%}
+.chart text{font-family:var(--font-body)}
+.pd{padding:14px 16px 16px}
+.lane{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.lane-h{display:flex;justify-content:space-between;gap:10px;font-size:12.5px}
+.lane-h b{font-weight:700}
+.lane-h .tot{font-family:var(--font-num);font-weight:700;font-size:16px;font-variant-numeric:tabular-nums}
+.stack{display:flex;height:22px;border-radius:3px;overflow:hidden;gap:2px}
+.stack div{min-width:3px}
+.s-raise{background:var(--accent-fill);opacity:.55}
+.s-check{background:var(--ink-3)}
+.s-review{background:var(--warn-fill)}
+.s-release{background:var(--good-fill)}
+.lane-key{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink-2)}
+.lane-key span{display:inline-flex;align-items:center;gap:6px}
+.lane-key i{width:9px;height:9px;border-radius:2px;display:inline-block}
+.lane-key b{color:var(--ink);font-variant-numeric:tabular-nums}
+.big3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.big3 div{display:flex;flex-direction:column;gap:2px}
+.big3 .v{font-family:var(--font-num);font-weight:700;font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+.big3 .l{font-size:11.5px;color:var(--ink-2)}
+.sub-h{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:700;margin:0 0 8px}
+.hbars{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.hbars:last-child{margin-bottom:0}
+.hb{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) 52px;gap:10px;align-items:center;font-size:12.5px}
+.hb .name{color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hb .t{height:8px;background:var(--track);border-radius:2px;overflow:hidden}
+.hb .t div{height:100%;background:var(--warn-fill)}
+.hb .t div.g{background:var(--good-fill)}
+.hb .t div.r{background:var(--danger-fill)}
+.hb .t div.a{background:var(--accent-fill)}
+.hb .pct{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
+.saved{display:flex;align-items:baseline;gap:10px;padding:10px 12px;border-radius:4px;background:var(--good-soft);margin-bottom:16px;font-size:12.5px;color:var(--ink-2)}
+.saved .v{font-family:var(--font-num);font-weight:700;font-size:22px;color:var(--good)}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:700;text-align:left;padding:10px 16px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 16px;border-bottom:1px solid var(--grid);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+th.r,td.r{text-align:right;font-variant-numeric:tabular-nums}
+.mini{display:inline-block;width:64px;height:6px;background:var(--track);border-radius:2px;vertical-align:middle;margin-left:8px;overflow:hidden}
+.mini i{display:block;height:100%;background:var(--good-fill)}
+
+footer{margin-top:22px;font-size:12px;color:var(--ink-3)}
+
+@keyframes sign{to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion: no-preference){
+  .live-dot{animation:pulse 1.8s ease-out infinite}
+  .vault .spin{animation:spin .9s linear infinite}
+  .typing i{animation:blink 1.2s infinite}
+  .typing i:nth-child(2){animation-delay:.2s}
+  .typing i:nth-child(3){animation-delay:.4s}
+  .step.active .node{animation:ring 1.6s ease-out infinite}
+}
+@media (prefers-reduced-motion: reduce){
+  .pad.draw path{animation-duration:.01s}
+  .now.enter,.m.enter,.chip.enter,.flow.just{animation:none}
+}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(61,220,151,.55)}100%{box-shadow:0 0 0 8px rgba(61,220,151,0)}}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
+@keyframes ring{0%{box-shadow:0 0 0 0 var(--accent-soft),0 0 0 6px var(--accent-soft)}100%{box-shadow:0 0 0 14px transparent,0 0 0 6px var(--accent-soft)}}
+@keyframes flash{from{background:var(--good-soft)}to{background:transparent}}
+.is-paused *{animation-play-state:paused!important}
+
+@media (max-width:1080px){
+  .story{grid-template-columns:minmax(0,1fr)}
+  .phone{position:relative;top:0;height:520px;max-width:360px;width:100%;justify-self:center}
+  .below,.grid2,.grid2.even{grid-template-columns:minmax(0,1fr)}
+  .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width:760px){
+  .bands{display:none}
+  .steps{grid-template-columns:minmax(0,1fr);gap:12px}
+  .rail{left:26px;right:auto;top:28px;bottom:28px;width:4px;height:auto}
+  .rail .fill{width:100%;height:calc(var(--p,0) * 100%);background:linear-gradient(180deg,var(--good-fill),var(--accent-fill))}
+  .rail .fill::after{right:auto;left:50%;margin-left:-7px;top:auto;bottom:-7px;margin-top:0}
+  .step{flex-direction:row;text-align:left;gap:14px}
+  .step .dept-m{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
+  .timer{text-align:left}
+  .ctl{justify-content:flex-start}
+  .wo,.journey{padding-inline:16px}
+  .now{margin-inline:12px;padding:16px}
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .flow{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .flow .st{grid-column:1 / -1}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hb{grid-template-columns:minmax(0,110px) minmax(0,1fr) 46px}
+}
+
+/* ── Additions: filters, deltas, today strip, economics, business + ledger views ── */
+.filters{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;margin-bottom:16px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+.fgroup{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--ink-3);font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.seg{display:flex;gap:2px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:2px}
+.seg button{appearance:none;border:0;background:transparent;color:var(--ink-2);font:600 12.5px var(--font-body);padding:5px 11px;border-radius:4px;cursor:pointer}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+.seg button:focus-visible,.sel:focus-visible,.chipf:focus-visible,.srch:focus-visible,tr.row:focus-visible{outline:2px solid var(--accent-fill);outline-offset:1px}
+.sel{font:600 12.5px var(--font-body);background:var(--surface-2);color:var(--ink);border:1px solid var(--border-strong);border-radius:var(--radius);padding:5px 8px;max-width:100%}
+.fnote{margin-left:auto;font-size:12px;color:var(--ink-3)}
+.fnote b{color:var(--ink-2);font-weight:600}
+
+.dl{font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dl.good{color:var(--good)} .dl.bad{color:var(--danger)} .dl.flat{color:var(--ink-3)}
+.kpi .sub .dl{margin-right:4px}
+.kpi.warn .val{color:var(--warn)}
+
+.today-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin-bottom:8px}
+.today-h b{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);font-weight:700}
+.today-h span{font-size:12px;color:var(--ink-3)}
+.kpis.sm .val{font-size:28px}
+.kpi .val.bump{animation:bump .9s ease-out}
+@keyframes bump{from{color:var(--good)}to{color:inherit}}
+
+.econ{display:flex;flex-wrap:wrap;gap:1px;margin:10px 24px 0;background:var(--border);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.econ div{flex:1 1 120px;background:var(--surface-2);padding:8px 12px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.econ span{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
+.econ b{font-family:var(--font-num);font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.econ b.g{color:var(--good)}
+.econ small{font-size:11.5px;color:var(--ink-3)}
+.prior{margin-top:10px;font-size:13px;color:var(--ink-2)}
+.prior b{color:var(--ink)}
+.flow .who span.ty{color:var(--accent)}
+
+.gauge{display:flex;flex-direction:column;gap:6px;min-width:min(100%,340px)}
+.gauge .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
+.gauge .trk{position:relative;height:14px;border-radius:3px;background:var(--track)}
+.gauge .band{position:absolute;top:0;bottom:0;background:var(--good-soft);border-left:2px solid var(--good-fill);border-right:2px solid var(--good-fill)}
+.gauge .mk{position:absolute;top:-5px;bottom:-5px;width:3px;margin-left:-1.5px;border-radius:2px;background:var(--ink)}
+.gauge .ax{position:relative;height:14px;font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.gauge .ax span{position:absolute;transform:translateX(-50%)}
+.gauge .note{font-size:12.5px;color:var(--ink-2)}
+.gauge .note b{color:var(--ink)}
+
+.mg{font-variant-numeric:tabular-nums;font-weight:600}
+.mg.lo{color:var(--warn)} .mg.ok{color:var(--good)} .mg.hi{color:var(--accent)}
+.mbar{position:relative;display:inline-block;width:72px;height:8px;background:var(--track);border-radius:2px;vertical-align:middle;margin-left:8px}
+.mbar .bd{position:absolute;top:0;bottom:0;left:41.67%;width:25%;background:var(--good-soft)}
+.mbar .pt{position:absolute;top:-3px;bottom:-3px;width:3px;margin-left:-1.5px;border-radius:1px;background:var(--ink)}
+td.l2{color:var(--ink-3);font-size:12px}
+.foot-note{margin:0;padding:10px 16px 14px;font-size:12.5px;color:var(--ink-2);max-width:70ch}
+.aging .hb .t div{background:var(--accent-fill)}
+.aging .hb:nth-child(2) .t div{background:var(--warn-fill)}
+.aging .hb:nth-child(3) .t div,.aging .hb:nth-child(4) .t div{background:var(--danger-fill)}
+.hb .pct.w{width:auto}
+.hb.wide{grid-template-columns:minmax(0,150px) minmax(0,1fr) 84px}
+
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.pill.g{background:var(--good-soft);color:var(--good)}
+.pill.w{background:var(--warn-soft);color:var(--warn)}
+.pill.r{background:var(--danger-soft);color:var(--danger)}
+.pill.a{background:var(--accent-soft);color:var(--accent)}
+.pill.n{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--border)}
+.pd-dots{display:inline-flex;gap:3px;vertical-align:middle;margin-left:6px}
+.pd-dots i{width:8px;height:8px;border-radius:50%;background:var(--good-fill)}
+.pd-dots i.w{background:var(--warn-fill)} .pd-dots i.r{background:var(--danger-fill)} .pd-dots i.a{background:var(--accent-fill)}
+
+/* ledger */
+.l-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:12px 16px;border-bottom:1px solid var(--border)}
+.srch{flex:1 1 220px;min-width:0;font:500 13.5px var(--font-body);background:var(--surface-2);color:var(--ink);border:1px solid var(--border-strong);border-radius:var(--radius);padding:7px 10px}
+.srch::placeholder{color:var(--ink-3)}
+.chipsf{display:flex;flex-wrap:wrap;gap:6px}
+.chipf{appearance:none;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink-2);font:600 12px var(--font-body);padding:5px 10px;border-radius:999px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.chipf b{font-variant-numeric:tabular-nums;color:var(--ink-3);font-weight:600}
+.chipf[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent-fill);color:var(--accent)}
+.chipf[aria-pressed="true"] b{color:var(--accent)}
+.l-count{font-size:12px;color:var(--ink-3);margin-left:auto}
+tr.row{cursor:pointer}
+tr.row:hover td,tr.row.open td{background:var(--surface-2)}
+tr.row td:first-child b{display:block}
+tr.row .car{display:inline-block;width:10px;color:var(--ink-3);transition:transform .2s}
+tr.row.open .car{transform:rotate(90deg)}
+tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18px}
+.det{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr);gap:18px}
+.det h4{margin:10px 0 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
+.pays{display:flex;flex-direction:column;gap:8px}
+.pay{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--ink-2)}
+.pay .top{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.pay .top b{color:var(--ink);font-size:13px}
+.pay .top .amt{margin-left:auto;font-family:var(--font-num);font-weight:700;font-size:17px;color:var(--ink);font-variant-numeric:tabular-nums}
+.pay .amt s{color:var(--ink-3);font-weight:500;font-size:14px;margin-right:6px}
+.kv{display:grid;grid-template-columns:auto auto;justify-content:space-between;gap:5px 14px;font-size:12.5px;color:var(--ink-2)}
+.kv b{color:var(--ink);font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.kv .tot{border-top:1px solid var(--border);padding-top:5px}
+.more{display:flex;justify-content:center;padding:12px}
+.empty{padding:28px 16px;text-align:center;color:var(--ink-3)}
+
+@media (max-width:1080px){
+  .det{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:760px){
+  .econ{margin-inline:12px}
+  .kpis.sm{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .fnote{margin-left:0}
+  .l-count{margin-left:0}
+}
+</style>
+
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3.5 17.5l3 3 5.8-5.8a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.3-.6-.6-2.3z"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/><path d="M13 20h7"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+  <symbol id="i-review" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3L10 14"/><path d="M21 3l-7 18-4-7-7-4z"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></symbol>
+  <symbol id="i-bank" viewBox="0 0 24 24"><path d="M3 10l9-6 9 6"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20.5h18"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/></symbol>
+</svg>
+
+<div class="wrap">
+  <header class="bar">
+    <div class="brand">
+      <span class="eyebrow">Seamless FM</span>
+      <h1>Payouts &amp; Margins</h1>
+    </div>
+    <div class="tabs" role="tablist" aria-label="View">
+      <button class="tab" role="tab" id="tab-live" aria-selected="true" aria-controls="view-live"><span class="live-dot" aria-hidden="true"></span>Live</button>
+      <button class="tab" role="tab" id="tab-business" aria-selected="false" aria-controls="view-business">Business</button>
+      <button class="tab" role="tab" id="tab-payments" aria-selected="false" aria-controls="view-payments">Payments</button>
+      <button class="tab" role="tab" id="tab-ledger" aria-selected="false" aria-controls="view-ledger">Work orders</button>
+    </div>
+    <span class="spacer"></span>
+    <span class="sim-chip" title="Modeled data for demonstration">Simulated data</span>
+  </header>
+
+  <!-- shared filters for the three analytics views -->
+  <div class="filters" id="filters" hidden>
+    <div class="fgroup">Period
+      <div class="seg" id="f-period" role="group" aria-label="Period">
+        <button type="button" data-p="7" aria-pressed="false">7 days</button>
+        <button type="button" data-p="30" aria-pressed="true">30 days</button>
+        <button type="button" data-p="90" aria-pressed="false">90 days</button>
+      </div>
+    </div>
+    <label class="fgroup" for="f-trade">Trade <select class="sel" id="f-trade"></select></label>
+    <label class="fgroup" for="f-region">Region <select class="sel" id="f-region"></select></label>
+    <label class="fgroup" for="f-client">Client <select class="sel" id="f-client"></select></label>
+    <span class="fnote" id="f-note"></span>
+  </div>
+
+  <!-- ═══════════════ LIVE ═══════════════ -->
+  <section id="view-live" role="tabpanel" aria-labelledby="tab-live">
+    <div class="today-h"><b>Today so far</b><span id="today-date"></span></div>
+    <div class="kpis sm" id="today"></div>
+
+    <div class="story" id="story">
+      <div class="main" id="main">
+        <canvas id="confetti" aria-hidden="true"></canvas>
+        <div class="wo">
+          <div>
+            <div class="eyebrow"><span class="live-dot" aria-hidden="true"></span>Following one payment, start to finish</div>
+            <h2 id="wo-title">Rooftop unit not cooling</h2>
+            <div class="meta" id="wo-meta"></div>
+          </div>
+          <div class="timer" id="timer">
+            <div class="lbl" id="timer-lbl">Since job completed</div>
+            <div class="v" id="timer-v">0<small>m</small></div>
+            <div class="s" id="timer-s"></div>
+            <div class="ctl"><button type="button" class="btn" id="pause">Pause</button><button type="button" class="btn" id="next">Next work order</button></div>
+          </div>
+        </div>
+        <div class="econ" id="econ"></div>
+
+        <div class="journey" id="journey">
+          <div class="bands" id="bands"></div>
+          <ol class="steps" id="steps"><li class="rail" aria-hidden="true" style="list-style:none"><span class="fill"></span></li></ol>
+        </div>
+
+        <div class="now" id="now" aria-live="polite"></div>
+      </div>
+
+      <aside class="phone" aria-label="Technician's phone">
+        <div class="ph-top">
+          <div class="notch" aria-hidden="true"></div>
+          <div class="ava" id="ph-ava">MR</div>
+          <b>Seamless FM Dispatch</b>
+          <span id="ph-who">Text messages · Marcus R.</span>
+        </div>
+        <div class="msgs" id="msgs"><div class="typing" id="typing"><i></i><i></i><i></i></div></div>
+      </aside>
+    </div>
+
+    <div class="below">
+      <div class="panel">
+        <div class="panel-h"><h2>Also on the way</h2><span class="meta">Other payments moving through the same steps</span></div>
+        <ul class="flows" id="flows"></ul>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h2>Just paid</h2><span class="meta">Newest first</span></div>
+        <div class="wall" id="wall"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ BUSINESS ═══════════════ -->
+  <section id="view-business" role="tabpanel" aria-labelledby="tab-business" hidden>
+    <div class="a-head">
+      <div>
+        <div class="range" id="b-range"></div>
+        <p class="headline" id="b-headline"></p>
+      </div>
+      <div class="gauge" id="b-gauge"></div>
+    </div>
+    <div class="kpis" id="b-kpis"></div>
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-h"><h2>Billed, cost and margin</h2><span class="meta" id="b-rev-meta"></span></div>
+        <div class="chart" id="c-rev"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h2>Margin on every job</h2><span class="meta">Share of work orders by gross margin</span></div>
+        <div class="chart" id="c-mhist"></div>
+      </div>
+    </div>
+    <div class="grid2 even">
+      <div class="panel">
+        <div class="panel-h"><h2>By trade</h2><span class="meta">Work orders closed in the period</span></div>
+        <div class="tbl-wrap"><table id="b-trades"></table></div>
+        <div class="panel-h" style="border-top:1px solid var(--border)"><h2>By region</h2><span class="meta">Same period</span></div>
+        <div class="tbl-wrap"><table id="b-regions"></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h2>By client</h2><span class="meta">Revenue, margin and how fast they pay</span></div>
+        <div class="tbl-wrap"><table id="b-clients"></table></div>
+      </div>
+    </div>
+    <div class="grid2 even">
+      <div class="panel">
+        <div class="panel-h"><h2>Cash cycle</h2><span class="meta">Technicians paid now, clients pay later</span></div>
+        <div class="pd" id="b-cash"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h2>Lowest-margin jobs</h2><span class="meta">Below the 25% floor, worst first</span></div>
+        <div class="tbl-wrap"><table id="b-watch"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ PAYMENTS ═══════════════ -->
+  <section id="view-payments" role="tabpanel" aria-labelledby="tab-payments" hidden>
+    <div class="a-head">
+      <div>
+        <div class="range" id="p-range"></div>
+        <p class="headline" id="p-headline"></p>
+      </div>
+      <div class="compare" id="p-compare"></div>
+    </div>
+    <div class="kpis" id="p-kpis"></div>
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-h"><h2>How long technicians wait</h2><span class="meta">Minutes from sign-off to technician paid</span></div>
+        <div class="chart" id="c-hist"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h2>Where the time goes</h2><span class="meta">Median time per step</span></div>
+        <div class="pd" id="lanes"></div>
+      </div>
+    </div>
+    <div class="grid2 even">
+      <div class="panel">
+        <div class="panel-h"><h2>Speed over time</h2><span class="meta" id="trend-meta"></span></div>
+        <div class="chart" id="c-trend"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h2>Human review</h2><span class="meta">Payments held before release</span></div>
+        <div class="pd" id="review"></div>
+      </div>
+    </div>
+    <div class="grid2 even">
+      <div class="panel">
+        <div class="panel-h"><h2>Payments per work order</h2><span class="meta">Trip, parts and completion payments</span></div>
+        <div class="pd" id="structure"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h2>When and how payments go out</h2><span class="meta">Payments released by weekday and hour</span></div>
+        <div class="chart" id="c-heat"></div>
+        <div class="pd" id="methods" style="padding-top:4px"></div>
+      </div>
+    </div>
+    <div class="grid2 even">
+      <div class="panel">
+        <div class="panel-h"><h2>By trade</h2><span class="meta">Payments released</span></div>
+        <div class="tbl-wrap"><table id="trades"></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h2>Top technicians</h2><span class="meta">By amount paid in the period</span></div>
+        <div class="tbl-wrap"><table id="techs"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ WORK ORDERS ═══════════════ -->
+  <section id="view-ledger" role="tabpanel" aria-labelledby="tab-ledger" hidden>
+    <div class="panel">
+      <div class="l-bar">
+        <input type="search" class="srch" id="l-q" placeholder="Search work order, technician, client or site" aria-label="Search work orders">
+        <div class="chipsf" id="l-chips" role="group" aria-label="Show"></div>
+        <span class="l-count" id="l-count"></span>
+      </div>
+      <div class="tbl-wrap"><table id="ledger"></table></div>
+      <div class="more" id="l-more"></div>
+    </div>
+  </section>
+
+  <footer>Simulated data for demonstration. Work orders, clients, people, timings and amounts are modeled on our payment workflow (about 4,000 work orders and 8,000+ technician payments a month, $500–$700 average job, 25–40% gross margin target) and are not actual records.</footer>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $ = s => document.querySelector(s);
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ── random + distributions ── */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function gauss(r){let u=0,v=0;while(!u)u=r();while(!v)v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function logn(r,med,sig){return med*Math.exp(sig*gauss(r));}
+function wpick(r,items){const s=items.reduce((a,b)=>a+b.w,0);let x=r()*s;for(const it of items){x-=it.w;if(x<=0)return it;}return items[items.length-1];}
+function pick(r,arr){return arr[Math.floor(r()*arr.length)];}
+function median(a){return pct(a,.5);}
+function pct(a,p){if(!a.length)return NaN;const s=Float64Array.from(a).sort();const i=(s.length-1)*p,lo=Math.floor(i),hi=Math.ceil(i);return s[lo]+(s[hi]-s[lo])*(i-lo);}
+function sum(a,f){let s=0;for(const x of a)s+=f(x);return s;}
+const r5=n=>Math.round(n/5)*5;
+
+/* ── the business model ──
+   ~4,000 work orders a month, 2–3 technician payments on most of them (~8,300 payments),
+   $500–$700 average job, 25–40% gross margin target. */
+const TRADES=[
+  {name:'HVAC',w:30,mean:680,sig:.42,mg:.33},
+  {name:'Plumbing',w:22,mean:560,sig:.45,mg:.31},
+  {name:'Electrical',w:16,mean:610,sig:.42,mg:.34},
+  {name:'Handyman',w:12,mean:380,sig:.40,mg:.38},
+  {name:'Refrigeration',w:9,mean:820,sig:.45,mg:.29},
+  {name:'Roofing',w:6,mean:900,sig:.50,mg:.27},
+  {name:'Locksmith',w:5,mean:290,sig:.35,mg:.40}];
+const CLIENTS=[
+  {name:'Larkspur Markets',w:18,terms:30,late:.08,pre:'Store #'},
+  {name:'Kestrel Pharmacy',w:15,terms:45,late:.15,pre:'Store #'},
+  {name:'Orchard Street Cafés',w:14,terms:30,late:.20,pre:'Café #'},
+  {name:'Copperline Auto Care',w:12,terms:30,late:.10,pre:'Shop #'},
+  {name:'Pinecrest Urgent Care',w:10,terms:45,late:.25,pre:'Clinic #'},
+  {name:'Meridian Fitness',w:9,terms:45,late:.18,pre:'Club #'},
+  {name:'Bluebird Inns',w:8,terms:60,late:.30,pre:'Inn #'},
+  {name:'Halvorsen Bank',w:7,terms:60,late:.05,pre:'Branch #'},
+  {name:'Other accounts',w:7,terms:30,late:.22,pre:'Site #'}];
+const CITIES=[['Dallas, TX','Texas'],['Houston, TX','Texas'],['San Antonio, TX','Texas'],['Phoenix, AZ','West'],['Denver, CO','West'],['Las Vegas, NV','West'],
+  ['Atlanta, GA','Southeast'],['Tampa, FL','Southeast'],['Orlando, FL','Southeast'],['Charlotte, NC','Southeast'],['Nashville, TN','Southeast'],['Columbus, OH','Midwest']];
+const REGIONS=['Texas','Southeast','West','Midwest'];
+const METHODS=[{name:'Instant bank transfer',w:71},{name:'Instant to debit card',w:29}];
+const REASONS=[{name:'Above quoted cost',w:30},{name:'First payment to payee',w:22},{name:'Receipt missing',w:18},{name:'Alternate recipient',w:12},{name:'Possible duplicate',w:7},{name:'Rate above vendor card',w:5}];
+const FLOOR='Margin below 25% floor';
+const PTYPES=['Trip & diagnostic','Parts advance','Completion'];
+const REVIEWERS=['Dana K.','Luis M.','Priya S.'];
+const FIRST=['Marcus','Andre','Jose','Tyler','Dwayne','Carlos','Kevin','Luis','Brandon','Terrence','Miguel','Ryan','Jamal','Derek','Hector','Sean','Victor','Darnell','Eric','Ramon','Travis','Omar','Cody','Jorge','Reggie','Nate','Angel','Wes','Isaac','Malik'];
+const LASTI='ABCDEFGHJKLMNPRSTVW';
+const NTECH=900;
+function techName(id){return FIRST[id%FIRST.length]+' '+LASTI[(id*7+3)%LASTI.length]+'.';}
+function shape(h){if(h<6||h>=22)return .2;if(h<8)return .6;if(h<18)return 1;return .5;}
+
+/* 180 days of history ending Oct 6, 2026 (day 179). Time is in hours from day 0. */
+const NDAY=180, NOW=NDAY*24;
+function dDate(d){return new Date(2026,9,6-(NDAY-1)+d);}
+
+function payTiming(r,trend,type,lowMargin){
+  const raise=(type==='Completion'?logn(r,.38,.6):logn(r,.24,.5))*Math.sqrt(trend);
+  const verify=.05+r()*.02;
+  let flagged=r()<(type==='Completion'?.115:.07);const reasons=[];
+  if(lowMargin&&r()<.7){flagged=true;reasons.push(FLOOR);}
+  if(flagged&&!reasons.length){reasons.push(wpick(r,REASONS).name);if(r()<.2){const b=wpick(r,REASONS).name;if(b!==reasons[0])reasons.push(b);}}
+  const review=flagged?logn(r,.08,.25)*trend:0;
+  let outcome='approved';
+  if(flagged){const x=r(),fl=reasons[0]===FLOOR;if(x<(fl?.02:.06))outcome='rejected';else if(x<(fl?.5:.19))outcome='adjusted';}
+  const release=logn(r,.11,.2)*trend;
+  return {raise,verify,flagged,reasons,review,outcome,release,method:wpick(r,METHODS).name,reviewer:pick(r,REVIEWERS)};
+}
+
+function makeWO(r,d,tClose,trend,seq,pays){
+  const T=wpick(r,TRADES),C=wpick(r,CLIENTS),ci=Math.floor(r()*CITIES.length);
+  const billed=Math.min(6500,Math.max(95,r5(logn(r,T.mean/Math.exp(T.sig*T.sig/2),T.sig))));
+  const mq=Math.min(.58,Math.max(.06,T.mg+gauss(r)*.055));
+  const quoted=r5(billed*(1-mq));
+  const x=r(),types=x<.12?['Completion']:x<.80?(r()<.6?['Trip & diagnostic','Completion']:['Parts advance','Completion']):PTYPES.slice();
+  const techId=Math.floor(r()*NTECH);
+  const w={id:'WO-'+seq,day:d,tClose,trade:T.name,client:C.name,terms:C.terms,city:CITIES[ci][0],region:CITIES[ci][1],
+    site:C.pre+(100+Math.floor(r()*2900)),techId,tech:techName(techId),billed,quoted,pays:[]};
+  const amts=types.map(tp=>tp==='Trip & diagnostic'?r5(quoted*(.14+r()*.08)):tp==='Parts advance'?r5(quoted*(.28+r()*.12)):0);
+  amts[amts.length-1]=quoted-amts.reduce((a,b)=>a+b,0);
+  const trig=[];trig[types.length-1]=tClose;
+  for(let j=types.length-2;j>=0;j--)trig[j]=trig[j+1]-(types[j]==='Parts advance'?6+r()*40:20+r()*70);
+  types.forEach((tp,j)=>{
+    const p=payTiming(r,trend,tp,mq<.22&&tp==='Completion');
+    p.type=tp;p.idx=j+1;p.of=types.length;p.amount=amts[j];
+    p.paidAmount=p.outcome==='rejected'?0:p.outcome==='adjusted'?Math.max(40,r5(amts[j]*(.72+r()*.18))):amts[j];
+    p.tTrigger=trig[j];p.day=Math.floor(trig[j]/24);
+    p.tPaid=p.outcome==='rejected'?null:trig[j]+p.raise+p.verify+p.review+p.release;
+    p.ctp=p.tPaid==null?null:p.tPaid-trig[j];
+    p.wo=w;w.pays.push(p);if(p.day>=0)pays.push(p);
+  });
+  w.cost=sum(w.pays,p=>p.paidAmount);w.gp=w.billed-w.cost;w.margin=w.gp/w.billed;
+  w.flagged=w.pays.some(p=>p.flagged);
+  w.invoiceT=tClose+12+r()*36;w.dueT=w.invoiceT+C.terms*24;
+  const late=r()<C.late?8+r()*40:0;
+  w.collectT=w.invoiceT+24*Math.max(5,C.terms*(.82+r()*.22)+gauss(r)*3+late);
+  return w;
+}
+
+const DATA=(function(){
+  const r=mulberry32(90210),wos=[],pays=[];let seq=30001;
+  for(let d=0;d<NDAY;d++){
+    const dow=dDate(d).getDay(),wk=(dow===0||dow===6)?.45:1;
+    const growth=.9+.15*(d/(NDAY-1)),trend=1.1-.2*(d/(NDAY-1));
+    const n=Math.round(150*growth*wk*(.9+r()*.2)),day=[];
+    for(let i=0;i<n;i++){let h;do{h=r()*24;}while(r()>shape(h));day.push(d*24+h);}
+    day.sort((a,b)=>a-b).forEach(t=>wos.push(makeWO(r,d,t,trend,seq++,pays)));
+  }
+  return {wos,pays};
+})();
+
+/* ── formatting ── */
+const usd0=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
+const usd2=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2});
+function fmt$(n){return usd0.format(n);}
+function fmtK(n){return n>=1e6?'$'+(n/1e6).toFixed(2)+'M':n>=1e4?'$'+(n/1e3).toFixed(1)+'k':fmt$(n);}
+function fmtAx(n){return n>=1e6?'$'+(n/1e6).toFixed(n%1e6?1:0)+'M':n>=1e3?'$'+Math.round(n/1e3)+'k':'$'+n;}
+function fmtN(n){return Math.round(n).toLocaleString('en-US');}
+function fmtP(x,d=1){return isFinite(x)?(x*100).toFixed(d)+'%':'–';}
+function fmtH(h){if(!isFinite(h))return '–';if(h<1)return Math.round(h*60)+' min';return h.toFixed(1)+' h';}
+function hUnit(h){if(!isFinite(h))return '–';if(h<1)return Math.round(h*60)+'<small>min</small>';return h.toFixed(1)+'<small>h</small>';}
+function clockStr(t){const m=Math.floor(((t%24)+24)%24*60);let hh=Math.floor(m/60);const mm=m%60;const ap=hh>=12?'PM':'AM';hh=hh%12||12;return hh+':'+String(mm).padStart(2,'0')+' '+ap;}
+function hm(mins){mins=Math.max(0,Math.round(mins));const h=Math.floor(mins/60),m=mins%60;return h?`${h}<small>h</small>${String(m).padStart(2,'0')}<small>m</small>`:`${m}<small>m</small>`;}
+function hmText(mins){mins=Math.round(mins);const h=Math.floor(mins/60),m=mins%60;return h?`${h} h ${m} min`:`${m} min`;}
+function fmtD(d){return dDate(d).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+function fmtDT(t){return fmtD(Math.floor(t/24))+', '+clockStr(t);}
+function ic(id,cls){return `<svg class="i${cls?' '+cls:''}"><use href="#i-${id}"/></svg>`;}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function mgCls(m){return m<.25?'lo':m>.40?'hi':'ok';}
+function mgCell(m,bar){return `<span class="mg ${mgCls(m)}">${fmtP(m)}</span>${bar?`<span class="mbar" aria-hidden="true"><span class="bd"></span><span class="pt" style="left:${Math.min(100,Math.max(0,m/.6*100))}%"></span></span>`:''}`;}
+
+/* ══════════════════ LIVE: ONE PAYMENT'S JOURNEY ══════════════════ */
+const DEPTS=[{n:'Field',span:3},{n:'Operations',span:2},{n:'Accounts Payable',span:1},{n:'Bank',span:1},{n:'Technician',span:1}];
+const STEPS=[
+  {key:'done',   dept:0,label:'Job completed',          icon:'wrench', dur:2800},
+  {key:'sign',   dept:0,label:'Manager signed off',     icon:'pen',    dur:3800},
+  {key:'photos', dept:0,label:'After photos submitted', icon:'camera', dur:3200},
+  {key:'review', dept:1,label:'Photos reviewed',        icon:'review', dur:4000},
+  {key:'trigger',dept:1,label:'Payment triggered',      icon:'send',   dur:3000},
+  {key:'ap',     dept:2,label:'Payment issued',         icon:'receipt',dur:3400},
+  {key:'bank',   dept:3,label:'Bank confirmed',         icon:'bank',   dur:3400},
+  {key:'paid',   dept:4,label:'Technician paid',        icon:'user',   dur:5600},
+];
+const JOBS=[
+  {trade:'HVAC',title:'Rooftop unit not cooling',billed:660,work:['Failed contactor replaced','Supply air back down to 41°F','Filters replaced on both units'],photos:['Condenser','New contactor','Filters','Supply temp']},
+  {trade:'Refrigeration',title:'Walk-in cooler holding at 48°F',billed:790,work:['Evaporator fan motor replaced','Box holding steady at 36°F','Door gasket adjusted'],photos:['Evaporator','Fan motor','Thermometer','Door gasket']},
+  {trade:'Plumbing',title:'Leak under the prep sink',billed:560,work:['Drain line resealed','Pressure tested with no leaks','Area cleaned and dried'],photos:['Drain line','P-trap','Cabinet floor','Sink']},
+  {trade:'Electrical',title:'Back hallway lights and exit sign out',billed:600,work:['Two fixtures replaced','Exit sign battery tested','Breaker labeled in panel'],photos:['Fixtures','Exit sign','Panel','Hallway']},
+  {trade:'Handyman',title:'Front entry door closer broken',billed:380,work:['Door closer replaced','Swing speed adjusted','Latch tested ten times'],photos:['Closer','Hinge','Latch','Entry']},
+];
+const PATTERNS=[['Trip & diagnostic','Completion'],['Completion'],PTYPES,['Parts advance','Completion']];
+const SIGNERS=[['J. Alvarez','Store Manager'],['K. Thompson','Facility Manager'],['R. Patel','General Manager'],['S. Nguyen','Shift Lead']];
+const OPS=['Priya S.','Luis M.','Tasha B.'];
+const APS=['Dana K.','Mark O.'];
+const PHOTO_BG=['linear-gradient(135deg,#46535e,#1f2a33 70%)','linear-gradient(160deg,#6b5b47,#2b241c 75%)','linear-gradient(135deg,#3f5a52,#17261f 70%)','linear-gradient(150deg,#5a5f6e,#22252e 70%)'];
+const SIG='M4 58 C 16 18, 34 12, 30 52 S 40 70, 52 40 S 66 18, 70 46 S 80 66, 92 38 C 100 22, 112 26, 106 50 S 122 64, 134 36 S 150 30, 156 48 S 170 58, 186 34 C 194 24, 204 30, 200 46 M 120 70 C 150 62, 190 60, 236 62';
+
+const R=mulberry32(77031);
+let J=null,jCount=0,elapsed=0,paused=false,cur=-1,fired=new Set(),finished=false,holdLeft=0;
+
+function newJourney(){
+  const job=JOBS[jCount%JOBS.length];
+  const first=FIRST[(jCount*7+3)%FIRST.length];
+  const tech=first+' '+LASTI[(jCount*5+11)%LASTI.length]+'.';
+  const hiccup=jCount%2===1;
+  const client=CLIENTS[(jCount*3)%8];
+  const billed=r5(job.billed*(.9+R()*.25));
+  const margin=.27+R()*.11;
+  const cost=r5(billed*(1-margin));
+  const types=PATTERNS[jCount%PATTERNS.length];
+  const earlier=types.slice(0,-1).map(t=>({type:t,amt:r5(cost*(t==='Parts advance'?.34:.18)),ago:t==='Parts advance'?'yesterday':'2 days ago'}));
+  const amount=cost-earlier.reduce((a,b)=>a+b.amt,0);
+  const T=10+R()*5,wts=[hiccup?.42:.32,.12,.26,.18,.12],ws=wts.reduce((a,b)=>a+b,0);
+  const mins=[0,5+R()*6,4+R()*6,...wts.map(w=>w/ws*T)];
+  const cum=[];mins.reduce((a,b,i)=>(cum[i]=a+b),0);
+  const durs=STEPS.map(s=>s.dur+(s.key==='review'&&hiccup?3800:0));
+  const starts=[];durs.reduce((a,b,i)=>(starts[i]=a,a+b),0);
+  J={job,tech,first,hiccup,client,billed,cost,margin:(billed-cost)/billed,types,earlier,amount,cum,durs,starts,total:starts[7]+durs[7],
+    wo:'WO-'+(65213+jCount*37),site:client.pre+(1142+jCount*311)%3000,city:CITIES[(jCount*5)%CITIES.length][0],
+    signer:SIGNERS[jCount%SIGNERS.length],ops:OPS[jCount%OPS.length],ap:APS[jCount%APS.length],
+    start:13+(jCount%5)*.6+R()*.4,ref:'PAY-'+(180700+jCount*13)};
+  jCount++;elapsed=0;cur=-1;fired=new Set();finished=false;holdLeft=0;
+
+  $('#wo-title').textContent=job.title;
+  $('#wo-meta').innerHTML=`<b>${J.wo}</b> · ${job.trade} · ${esc(client.name)} ${J.site}, ${J.city} · Technician <b>${tech}</b>`;
+  const n=types.length;
+  $('#econ').innerHTML=`<div><span>Billed to client</span><b>${usd2.format(billed)}</b><small>${esc(client.name)} · Net ${client.terms}</small></div>
+    <div><span>Technician cost</span><b>${usd2.format(cost)}</b><small>${n} payment${n>1?'s':''} on this job</small></div>
+    <div><span>Gross margin</span><b class="g">${fmtP(J.margin)}</b><small>${usd2.format(billed-cost)} gross profit</small></div>
+    <div><span>This payment</span><b>${usd2.format(amount)}</b><small>${n} of ${n} · Completion</small></div>`;
+  $('#timer').classList.remove('paid');
+  $('#timer-lbl').textContent='Since job completed';
+  $('#timer-s').textContent='Completed '+clockStr(J.start);
+  $('#journey').classList.remove('complete');
+  $('#ph-ava').textContent=tech.split(' ').map(s=>s[0]).join('');
+  $('#ph-who').textContent='Text messages · '+tech;
+  const msgs=$('#msgs');[...msgs.querySelectorAll('.m')].forEach(n=>n.remove());
+  buildJourney();
+}
+
+function buildJourney(){
+  $('#bands').innerHTML=DEPTS.map((d,i)=>`<div class="band" id="band-${i}" style="--span:${d.span}">${d.n}</div>`).join('');
+  const ol=$('#steps');[...ol.querySelectorAll('.step')].forEach(n=>n.remove());
+  STEPS.forEach((s,i)=>{
+    const li=document.createElement('li');li.className='step';li.id='st-'+i;
+    li.innerHTML=`<div class="node">${ic(s.icon)}<span class="tick">${ic('check')}</span></div>
+      <div class="txt"><span class="dept-m">${DEPTS[s.dept].n}</span><span class="lab">${s.label}</span><span class="when"></span></div>`;
+    ol.appendChild(li);
+  });
+  $('#journey').style.setProperty('--p',0);
+}
+
+function head(dept,title,sub){return `<div class="now-h"><span class="d">${dept}</span><h3>${title}</h3><p>${sub}</p></div>`;}
+function tilesHTML(){return `<div class="tiles">${J.job.photos.map((p,i)=>`<div class="tile" id="tile-${i}"><div class="ph" style="background:${PHOTO_BG[i]}"></div><svg class="i cam"><use href="#i-camera"/></svg><span>${p}</span><b class="badge">${ic('check')}</b></div>`).join('')}</div>`;}
+function on(sel){const n=$(sel);if(n)n.classList.add('on');}
+function priorHTML(){
+  if(!J.earlier.length)return `<div class="prior">Single payment job. The full technician cost is released at completion.</div>`;
+  return `<div class="prior">Already paid on this job: ${J.earlier.map(e=>`<b>${e.type}</b> ${usd2.format(e.amt)} (${e.ago})`).join(' · ')}</div>`;
+}
+
+function enterStep(i){
+  const s=STEPS[i],t=J.start+J.cum[i]/60,now=$('#now'),n=J.types.length;
+  let h='';
+  if(s.key==='done')h=head('Field','Job completed on site',`${J.tech} finished the work at ${esc(J.client.name)} ${J.site} and checked out at ${clockStr(J.start)}.`)+
+    `<ul class="checks">${J.job.work.map((w,k)=>`<li id="ck-${k}"><span class="cb">${ic('check')}</span>${w}</li>`).join('')}</ul>`+priorHTML();
+  if(s.key==='sign')h=head('Field','Site manager sign-off','The customer confirms the work is done before anything moves.')+
+    `<div class="sig"><div class="pad" id="pad"><span class="x">×</span><svg viewBox="0 0 240 80" preserveAspectRatio="xMidYMid meet"><path d="${SIG}" pathLength="1"/></svg></div>
+     <div class="signed" id="signed"><b>${J.signer[0]}</b>${J.signer[1]} · signed ${clockStr(t)}</div></div>`;
+  if(s.key==='photos')h=head('Field','After photos submitted',`${J.first} uploads proof of the finished work from the job site.`)+tilesHTML();
+  if(s.key==='review')h=head('Operations','Operations reviews the photos','Every photo is checked by a person before payment is released.')+tilesHTML()+
+    `<div class="flagnote" id="flagnote">${ic('alert')}${J.job.photos[1]} photo is blurry. Retake requested from ${J.first}.</div>
+     <div class="reviewer">Reviewed by <b>${J.ops}</b>, Operations · Invoice cost checked against quote: <b>${fmtP(J.margin)} margin</b>, inside the 25–40% target</div><div class="allok" id="allok">${ic('check')}All photos approved</div>`;
+  if(s.key==='trigger')h=head('Operations','Operations triggers the payment','All checks passed. One click hands the payment to Accounts Payable.')+
+    `<div class="release"><div class="rbtn" id="rbtn">${ic('send')}<span id="rbtn-t">Release ${usd2.format(J.amount)}</span></div>
+     <div class="handoff" id="handoff">Operations<span class="arrow"><i></i></span>Accounts Payable</div></div>`;
+  if(s.key==='ap')h=head('Accounts Payable','Accounts Payable issues the payment',`${J.ap} sends it on the technician's chosen method.`)+
+    `<div class="amount" id="amt">$0.00</div><div class="facts"><span>Payment <b>${n} of ${n} · Completion</b></span><span>Method <b>Instant transfer</b></span><span>Reference <b>${J.ref}</b></span><span>To <b>${J.tech}</b></span></div>
+     <div class="stamp" id="stamp">${ic('check')}Issued</div>`;
+  if(s.key==='bank')h=head('Bank','Bank confirms the transfer','The bank verifies the payment and releases the funds.')+
+    `<div class="bankbox"><div class="vault" id="vault"><span class="spin"></span>${ic('lock')}</div>
+     <div class="bankmsg" id="bankmsg"><b>Waiting for confirmation…</b><span>Instant transfer · ${J.ref}</span></div></div>`;
+  if(s.key==='paid'){
+    const total=J.cum[7];
+    h=`<div class="now-h"><span class="d">Technician</span></div><h3 class="paid-h">${J.first} has been paid <em>${usd2.format(J.amount)}</em></h3>
+     <p class="paid-sub">Money in hand <b>${hmText(total)}</b> after the job was completed. ${n>1?`Total to ${J.first} for this job: <b>${usd2.format(J.cost)}</b> across ${n} payments.`:''} The client is invoiced <b>${usd2.format(J.billed)}</b> on Net ${J.client.terms} terms.</p>
+     <div class="happy">${['Field team','Operations','Accounts Payable','Bank',J.first].map((n,k)=>`<span id="hp-${k}"><i>${ic('check')}</i>${n}</span>`).join('')}</div>`;
+  }
+  now.innerHTML=h;now.classList.remove('enter');void now.offsetWidth;now.classList.add('enter');
+  if(s.key==='review')J.job.photos.forEach((_,k)=>on('#tile-'+k));
+}
+
+function beats(i){
+  const k=STEPS[i].key,b=[];
+  if(k==='done'){[.12,.35,.58].forEach((a,n)=>b.push([a,()=>on('#ck-'+n)]));
+    b.push([.5,()=>msg('in',`Thanks ${J.first}! ${J.wo} is marked complete. Next up: sign-off and after photos.`)]);}
+  if(k==='sign'){b.push([.05,()=>$('#pad')&&$('#pad').classList.add('draw')]);b.push([.66,()=>on('#signed')]);
+    b.push([.8,()=>msg('in',`${J.signer[1]} ${J.signer[0]} signed off on your work.`)]);}
+  if(k==='photos'){[.1,.25,.4,.55].forEach((a,n)=>b.push([a,()=>on('#tile-'+n)]));
+    b.push([.72,()=>msg('pics')]);}
+  if(k==='review'){
+    if(J.hiccup){
+      b.push([.1,()=>ok(0)]);
+      b.push([.2,()=>{const t=$('#tile-1');if(t){t.classList.add('bad','blur');t.querySelector('.badge').innerHTML=ic('alert');}on('#flagnote');$('#st-3').classList.add('hold');}]);
+      b.push([.27,()=>msg('in',`Quick fix: the ${J.job.photos[1].toLowerCase()} photo is blurry. Can you retake it?`)]);
+      b.push([.42,()=>msg('out','On it, sending now.')]);
+      b.push([.5,()=>msg('pics1')]);
+      b.push([.58,()=>{const t=$('#tile-1');if(t){t.classList.remove('bad','blur');t.querySelector('.badge').innerHTML=ic('check');t.classList.add('ok');}const f=$('#flagnote');if(f)f.classList.remove('on');$('#st-3').classList.remove('hold');}]);
+      b.push([.68,()=>ok(2)]);b.push([.78,()=>ok(3)]);
+    }else{[.15,.32,.49,.66].forEach((a,n)=>b.push([a,()=>ok(n)]));}
+    b.push([.82,()=>on('#allok')]);
+    b.push([.9,()=>msg('in','Photos approved. Your payment is being released.')]);}
+  if(k==='trigger'){b.push([.3,()=>{const r=$('#rbtn');if(r)r.classList.add('press');}]);
+    b.push([.38,()=>{const r=$('#rbtn');if(r){r.classList.remove('press');r.classList.add('done');$('#rbtn-t').textContent='Released to Accounts Payable';}on('#handoff');}]);}
+  if(k==='ap'){b.push([.62,()=>on('#stamp')]);b.push([.78,()=>msg('in',`Payment of ${usd2.format(J.amount)} has been issued to you.`)]);}
+  if(k==='bank'){b.push([.62,()=>{const v=$('#vault');if(v){v.classList.add('ok');v.innerHTML=ic('check');}const m=$('#bankmsg');if(m)m.querySelector('b').textContent='Confirmed. Funds released.';}]);}
+  if(k==='paid'){b.push([.02,()=>{msg('dep');burst();}]);
+    [.12,.2,.28,.36,.44].forEach((a,n)=>b.push([a,()=>on('#hp-'+n)]));
+    b.push([.3,()=>typing(true)]);
+    b.push([.5,()=>{typing(false);msg('out','That was fast. Thank you!');}]);}
+  return b;
+}
+function ok(n){const t=$('#tile-'+n);if(t)t.classList.add('ok');}
+
+function typing(v){$('#typing').classList.toggle('on',v);}
+function msg(kind,text){
+  const box=$('#msgs'),d=document.createElement('div');
+  if(kind==='in'||kind==='out'){d.className='m enter '+kind;d.textContent=text;}
+  if(kind==='pics'||kind==='pics1'){d.className='m out pics enter';const n=kind==='pics'?4:1;
+    d.innerHTML=Array.from({length:n},(_,i)=>`<div style="background:${PHOTO_BG[kind==='pics'?i:1]}"></div>`).join('');}
+  if(kind==='dep'){const n=J.types.length;d.className='m dep enter';d.innerHTML=`<div class="k">Deposit received</div><div class="a">${usd2.format(J.amount)}</div><div class="f">From Seamless FM · ${J.wo} · Payment ${n} of ${n} · Instant transfer</div>`;}
+  box.insertBefore(d,$('#typing'));
+  const all=box.querySelectorAll('.m');if(all.length>7)all[0].remove();
+}
+
+const cf=$('#confetti'),cx=cf.getContext('2d');let parts=[];
+function burst(){
+  if(reduceMotion)return;
+  const W=cf.clientWidth,H=cf.clientHeight,dpr=window.devicePixelRatio||1;cf.width=W*dpr;cf.height=H*dpr;cx.setTransform(dpr,0,0,dpr,0,0);
+  const cs=getComputedStyle(document.documentElement),cols=['--good-fill','--accent-fill','--warn-fill'].map(v=>cs.getPropertyValue(v).trim());
+  for(let i=0;i<140;i++)parts.push({x:W*.5+(Math.random()-.5)*W*.3,y:H*.55,vx:(Math.random()-.5)*11,vy:-6-Math.random()*9,r:3+Math.random()*4,c:cols[i%3],a:Math.random()*6,va:(Math.random()-.5)*.3,life:1});
+}
+function drawConfetti(){
+  if(!parts.length)return;
+  const W=cf.clientWidth,H=cf.clientHeight;cx.clearRect(0,0,W,H);
+  for(const p of parts){p.x+=p.vx;p.y+=p.vy;p.vy+=.32;p.vx*=.99;p.a+=p.va;p.life-=.007;
+    cx.save();cx.globalAlpha=Math.max(0,p.life);cx.translate(p.x,p.y);cx.rotate(p.a);cx.fillStyle=p.c;cx.fillRect(-p.r,-p.r/2,p.r*2,p.r);cx.restore();}
+  parts=parts.filter(p=>p.life>0&&p.y<H+20);
+  if(!parts.length)cx.clearRect(0,0,W,H);
+}
+
+function update(dt){
+  if(!J)return;
+  if(finished){holdLeft-=dt;if(holdLeft<=0){$('#main').classList.add('fade');finished=false;J.leaving=true;setTimeout(()=>{newJourney();$('#main').classList.remove('fade');},420);}return;}
+  if(J.leaving)return;
+  elapsed+=dt;
+  let i=0;while(i<7&&elapsed>=J.starts[i+1])i++;
+  if(i!==cur){
+    for(let k=Math.max(0,cur);k<i;k++)markDone(k);
+    cur=i;const st=$('#st-'+i);st.classList.add('active');enterStep(i);
+    document.querySelectorAll('.band').forEach((b,n)=>{b.classList.toggle('on',n===STEPS[i].dept);b.classList.toggle('ok',n<STEPS[i].dept);});
+  }
+  const f=Math.min(1,(elapsed-J.starts[i])/J.durs[i]);
+  runBeats(i,f);
+  if(STEPS[i].key==='ap'){const a=$('#amt');if(a){const p=Math.min(1,Math.max(0,(f-.08)/.5));a.textContent=usd2.format(J.amount*(1-Math.pow(1-p,3)));}}
+  const p=i===0?0:(i-1+Math.min(1,f*1.6))/7;
+  $('#journey').style.setProperty('--p',Math.min(1,p));
+  const prev=i===0?0:J.cum[i-1],mins=prev+(J.cum[i]-prev)*f;
+  $('#timer-v').innerHTML=hm(mins);
+  if(elapsed>=J.total){markDone(7);finish();}
+}
+let beatCache={};
+function runBeats(i,f){
+  if(!beatCache[i]||beatCache[i].j!==J)beatCache[i]={j:J,list:beats(i)};
+  beatCache[i].list.forEach(([a,fn],n)=>{const id=i+':'+n;if(f>=a&&!fired.has(id)){fired.add(id);fn();}});
+}
+function markDone(k){
+  const st=$('#st-'+k);if(!st||st.classList.contains('done'))return;
+  runBeats(k,1);
+  st.classList.remove('active','hold');st.classList.add('done');
+  st.querySelector('.when').textContent=clockStr(J.start+J.cum[k]/60);
+}
+function finish(){
+  finished=true;holdLeft=3800;
+  $('#journey').classList.add('complete');$('#journey').style.setProperty('--p',1);
+  document.querySelectorAll('.band').forEach(b=>{b.classList.remove('on');b.classList.add('ok');});
+  $('#timer').classList.add('paid');$('#timer-lbl').textContent='Job completed → paid';
+  $('#timer-v').innerHTML=hm(J.cum[7]);
+  $('#timer-s').textContent=clockStr(J.start)+' → '+clockStr(J.start+J.cum[7]/60);
+  addPaid({name:J.tech,trade:J.job.trade,amt:J.amount,type:'Completion'},true);
+  recordToday({type:'Completion',amt:J.amount,billed:J.billed,cost:J.cost});
+}
+
+/* today so far: seeded from the average recent weekday, scaled to the time of day */
+const TODAY=(function(){
+  const recent=DATA.wos.filter(w=>w.day>=NDAY-28&&dDate(w.day).getDay()%6!==0);
+  const days=new Set(recent.map(w=>w.day)).size||1,frac=.53;
+  const wos=recent.length/days*frac,billed=sum(recent,w=>w.billed)/days*frac,cost=sum(recent,w=>w.cost)/days*frac;
+  const rp=DATA.pays.filter(p=>p.day>=NDAY-28&&p.tPaid!=null&&dDate(p.day).getDay()%6!==0);
+  return {wos:Math.round(wos),pays:Math.round(rp.length/days*frac),paid:sum(rp,p=>p.paidAmount)/days*frac,billed,cost,review:9};
+})();
+function renderToday(bump){
+  const t=TODAY,mg=(t.billed-t.cost)/t.billed;
+  const k=[['Work orders closed',fmtN(t.wos),'≈ '+fmtN(t.wos/.53)+' by end of day'],
+    ['Payments released',fmtN(t.pays),(t.pays/Math.max(1,t.wos)).toFixed(1)+' per work order closed'],
+    ['Paid to technicians',fmtK(t.paid),'All by instant transfer'],
+    ['Billed to clients',fmtK(t.billed),'Invoices go out within 2 days'],
+    ['Gross margin',fmtP(mg),'Target 25–40%'],
+    ['In review now',String(t.review),'Held before release']];
+  $('#today').innerHTML=k.map(([l,v,s],n)=>`<div class="kpi${n===4?' hero':''}"><span class="lbl">${l}</span><span class="val num${bump&&bump.includes(n)?' bump':''}">${v}</span><span class="sub">${s}</span></div>`).join('');
+}
+function recordToday(p){
+  TODAY.pays++;TODAY.paid+=p.amt;const b=[1,2];
+  if(p.type==='Completion'){TODAY.wos++;TODAY.billed+=p.billed;TODAY.cost+=p.cost;b.push(0,3,4);}
+  if(Math.random()<.3){TODAY.review=Math.max(4,Math.min(16,TODAY.review+(Math.random()<.5?-1:1)));b.push(5);}
+  renderToday(b);
+}
+$('#today-date').textContent='Wednesday, Oct 7 · updates as payments land';
+
+/* ambient: other payments moving through the same eight steps */
+const FR=mulberry32(5150);let flows=[],woSeq=65400;
+function newFlow(minStep,maxStep){
+  const job=JOBS[Math.floor(FR()*JOBS.length)];
+  const pat=PATTERNS[Math.floor(FR()*PATTERNS.length)],j=Math.floor(FR()*pat.length);
+  const billed=r5(job.billed*(.85+FR()*.35)),cost=r5(billed*(1-(.26+FR()*.13)));
+  const amt=pat[j]==='Completion'?r5(cost*(pat.length===1?1:pat.length===2?.8:.5)):r5(cost*(pat[j]==='Parts advance'?.34:.18));
+  return {name:pick(FR,FIRST)+' '+LASTI[Math.floor(FR()*LASTI.length)]+'.',trade:job.trade,wo:'WO-'+(woSeq++),
+    type:pat[j],label:pat[j]+' · '+(j+1)+' of '+pat.length,billed,cost,amt,step:minStep+Math.floor(FR()*(maxStep-minStep+1))};
+}
+function renderFlows(justIdx){
+  $('#flows').innerHTML=flows.map((f,n)=>`<li class="flow${n===justIdx?' just':''}"><div class="who"><b>${f.name} · ${fmt$(f.amt)}</b><span>${f.wo} · ${f.trade} · <span class="ty">${f.label}</span></span></div>
+    <div class="dots" aria-hidden="true">${STEPS.map((_,k)=>`<i class="${k<f.step?'d':k===f.step?'a':''}"></i>`).join('')}</div>
+    <div class="st">${STEPS[f.step].label}</div></li>`).join('');
+}
+function addPaid(p,animate){
+  const w=$('#wall'),c=document.createElement('span');c.className='chip'+(animate?' enter':'');
+  c.innerHTML=`<i>${ic('check')}</i>${p.name}<span>${p.trade} · ${p.type==='Completion'?'Completion':p.type==='Parts advance'?'Parts':'Trip'} · ${fmt$(p.amt)}</span>`;
+  w.prepend(c);while(w.children.length>12)w.lastChild.remove();
+}
+for(let i=0;i<6;i++)flows.push(newFlow(0,6));
+for(let i=0;i<8;i++){const f=newFlow(0,0);addPaid(f,false);}
+renderFlows(-1);renderToday();
+let flowAcc=0;
+function tickFlows(dt){
+  flowAcc+=dt;if(flowAcc<1400)return;flowAcc=0;
+  const n=Math.floor(FR()*flows.length),f=flows[n];
+  f.step++;
+  if(f.step>=8){f.step=7;addPaid(f,true);recordToday(f);flows[n]=newFlow(0,1);}
+  renderFlows(n);
+}
+
+let last=performance.now();
+function frame(now){
+  const dt=Math.min(100,now-last);last=now;
+  if(!paused&&!document.hidden&&!$('#view-live').hidden){update(dt);tickFlows(dt);}
+  drawConfetti();
+  requestAnimationFrame(frame);
+}
+newJourney();
+requestAnimationFrame(frame);
+
+$('#pause').addEventListener('click',()=>{paused=!paused;$('#pause').textContent=paused?'Resume':'Pause';$('#story').classList.toggle('is-paused',paused);});
+$('#next').addEventListener('click',()=>{parts=[];newJourney();if(paused){paused=false;$('#pause').textContent='Pause';$('#story').classList.remove('is-paused');}});
+
+/* ══════════════════ ANALYTICS: shared filters ══════════════════ */
+const F={P:30,trade:'',region:'',client:''};
+function opts(el,label,list){el.innerHTML=`<option value="">${label}</option>`+list.map(x=>`<option>${esc(x)}</option>`).join('');}
+opts($('#f-trade'),'All trades',TRADES.map(t=>t.name));
+opts($('#f-region'),'All regions',REGIONS);
+opts($('#f-client'),'All clients',CLIENTS.map(c=>c.name));
+
+let CTX=null;
+function woMatch(w){return (!F.trade||w.trade===F.trade)&&(!F.region||w.region===F.region)&&(!F.client||w.client===F.client);}
+function ctx(){
+  if(CTX)return CTX;
+  const P=F.P,s=NDAY-P,ps=NDAY-2*P;
+  const all=DATA.wos.filter(woMatch);
+  const cur=all.filter(w=>w.day>=s),prev=all.filter(w=>w.day>=ps&&w.day<s);
+  const pays=DATA.pays.filter(p=>woMatch(p.wo));
+  const pCur=pays.filter(p=>p.day>=s),pPrev=pays.filter(p=>p.day>=ps&&p.day<s);
+  // buckets: daily for 7 and 30 days, weekly (built back from the last day) for 90
+  const size=P>30?7:1,bk=[];
+  for(let e=NDAY-1;e>=s;e-=size)bk.unshift({s:Math.max(s,e-size+1),e});
+  const bi=d=>{for(let i=bk.length-1;i>=0;i--)if(d>=bk[i].s)return i;return 0;};
+  CTX={P,s,all,cur,prev,pays,pCur,pPrev,bk,bi,size};
+  return CTX;
+}
+function rangeLabel(c){return `Last ${c.P} days · ${fmtD(c.s)} – ${fmtD(NDAY-1)}, 2026`;}
+function filterText(){const f=[F.trade,F.region,F.client].filter(Boolean);return f.length?f.join(' · '):'All trades, regions and clients';}
+
+function delta(cur,prev,goodUp,mode){
+  if(!isFinite(cur)||!isFinite(prev)||!prev)return '';
+  let d,txt;
+  if(mode==='pp'){d=(cur-prev)*100;txt=(d>=0?'+':'−')+Math.abs(d).toFixed(1)+' pts';}
+  else{d=(cur/prev-1)*100;txt=(d>=0?'+':'−')+Math.abs(d).toFixed(1)+'%';}
+  const flat=Math.abs(d)<(mode==='pp'?.15:.5);
+  const cls=flat?'flat':((d>0)===goodUp?'good':'bad');
+  return `<span class="dl ${cls}">${flat?'±':d>0?'▲':'▼'} ${txt.replace(/^[+−]/,'')}</span>`;
+}
+function kpi(l,v,s,cls){return `<div class="kpi${cls?' '+cls:''}"><span class="lbl">${l}</span><span class="val num">${v}</span><span class="sub">${s}</span></div>`;}
+function biz(wos){const rev=sum(wos,w=>w.billed),cost=sum(wos,w=>w.cost),np=sum(wos,w=>w.pays.length);
+  return {n:wos.length,rev,cost,gp:rev-cost,mg:rev?(rev-cost)/rev:NaN,avg:wos.length?rev/wos.length:NaN,ppj:wos.length?np/wos.length:NaN};}
+function niceStep(max,n){const raw=max/n,p=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/p;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p;}
+function bkLabel(c,i){const b=c.bk[i];return c.size===1?fmtD(b.s):fmtD(b.s);}
+
+/* ══════════════════ BUSINESS ══════════════════ */
+function renderBusiness(){
+  const c=ctx(),B=biz(c.cur),Bp=biz(c.prev),vs=`vs prior ${c.P} d`;
+  $('#b-range').textContent=rangeLabel(c)+' · '+filterText();
+  $('#b-headline').innerHTML=B.n?`<em>${fmtK(B.rev)}</em> billed on ${fmtN(B.n)} work orders at a <em>${fmtP(B.mg)}</em> gross margin.`:'No work orders match these filters.';
+  // margin gauge, 0–60% scale with the 25–40% target band
+  const at=v=>Math.min(100,Math.max(0,v/.6*100));
+  $('#b-gauge').innerHTML=`<span class="lbl">Gross margin against the 25–40% target</span>
+    <div class="trk"><span class="band" style="left:${at(.25)}%;width:${at(.40)-at(.25)}%"></span><span class="mk" style="left:${at(B.mg||0)}%" title="${fmtP(B.mg)}"></span></div>
+    <div class="ax">${[0,.1,.2,.25,.3,.4,.5,.6].filter(v=>v!==.2&&v!==.3).map(v=>`<span style="left:${at(v)}%">${Math.round(v*100)}%</span>`).join('')}</div>
+    <span class="note"><b>${fmtP(c.cur.filter(w=>w.margin>=.25&&w.margin<=.40).length/Math.max(1,B.n),0)}</b> of jobs inside the band · <b>${fmtN(c.cur.filter(w=>w.margin<.25).length)}</b> below the floor</span>`;
+  const mo=30/c.P;
+  $('#b-kpis').innerHTML=[
+    kpi('Billed to clients',fmtK(B.rev),`${delta(B.rev,Bp.rev,true)} ${vs}`),
+    kpi('Technician cost',fmtK(B.cost),`${delta(B.cost,Bp.cost,false)} ${fmtP(B.cost/B.rev,0)} of billings`),
+    kpi('Gross profit',fmtK(B.gp),`${delta(B.gp,Bp.gp,true)} ${vs}`,'hero'),
+    kpi('Gross margin',fmtP(B.mg).replace('%','<small>%</small>'),`${delta(B.mg,Bp.mg,true,'pp')} ${vs}`,B.mg<.25?'warn':''),
+    kpi('Work orders',fmtN(B.n),`${delta(B.n,Bp.n,true)} ≈ ${fmtN(B.n*mo)} / month`),
+    kpi('Average job',fmt$(B.avg),`${delta(B.avg,Bp.avg,true)} ${B.ppj.toFixed(2)} payments per job`)
+  ].join('');
+  $('#b-rev-meta').textContent=c.size===1?'Per day':'Per week';
+  revChart($('#c-rev'));mHist($('#c-mhist'));
+
+  // trades and regions
+  const rowsFor=(key,names,label)=>{
+    const out=names.map(nm=>{const b=biz(c.cur.filter(w=>w[key]===nm));return {nm,b};}).filter(x=>x.b.n).sort((a,b)=>b.b.rev-a.b.rev);
+    return `<thead><tr><th>${label}</th><th class="r">Jobs</th><th class="r">Avg job</th><th class="r">Billed</th><th class="r">Gross profit</th><th class="r">Margin</th></tr></thead><tbody>`+
+      out.map(({nm,b})=>`<tr><td>${esc(nm)}</td><td class="r">${fmtN(b.n)}</td><td class="r">${fmt$(b.avg)}</td><td class="r">${fmtK(b.rev)}</td><td class="r">${fmtK(b.gp)}</td><td class="r">${mgCell(b.mg,true)}</td></tr>`).join('')+'</tbody>';
+  };
+  $('#b-trades').innerHTML=rowsFor('trade',TRADES.map(t=>t.name),'Trade');
+  $('#b-regions').innerHTML=rowsFor('region',REGIONS,'Region');
+
+  // clients: revenue, margin, days to collect, outstanding today
+  const cl=CLIENTS.map(C=>{
+    const ws=c.cur.filter(w=>w.client===C.name),b=biz(ws);
+    const paid=c.all.filter(w=>w.client===C.name&&w.collectT<=NOW&&w.collectT>=c.s*24).map(w=>(w.collectT-w.invoiceT)/24);
+    const open=c.all.filter(w=>w.client===C.name&&w.collectT>NOW&&w.invoiceT<=NOW);
+    const over=open.filter(w=>w.dueT<NOW);
+    return {C,b,dso:median(paid),open:sum(open,w=>w.billed),over:sum(over,w=>w.billed)};
+  }).filter(x=>x.b.n).sort((a,b)=>b.b.rev-a.b.rev);
+  $('#b-clients').innerHTML=`<thead><tr><th>Client</th><th class="r">Jobs</th><th class="r">Billed</th><th class="r">Margin</th><th class="r">Terms</th><th class="r">Pays in</th><th class="r">Open</th><th class="r">Overdue</th></tr></thead><tbody>`+
+    cl.map(x=>`<tr><td>${esc(x.C.name)}</td><td class="r">${fmtN(x.b.n)}</td><td class="r">${fmtK(x.b.rev)}</td><td class="r">${mgCell(x.b.mg)}</td><td class="r">Net ${x.C.terms}</td>
+      <td class="r"><span class="${x.dso>x.C.terms+5?'mg lo':''}">${isFinite(x.dso)?Math.round(x.dso)+' d':'–'}</span></td><td class="r">${fmtK(x.open)}</td><td class="r">${x.over?`<span class="mg lo">${fmtK(x.over)}</span>`:'–'}</td></tr>`).join('')+'</tbody>';
+
+  // cash cycle
+  const comp=c.pCur.filter(p=>p.type==='Completion'&&p.ctp!=null).map(p=>p.ctp);
+  const collected=c.all.filter(w=>w.collectT<=NOW&&w.collectT>=c.s*24).map(w=>(w.collectT-w.tClose)/24);
+  const open=c.all.filter(w=>w.collectT>NOW&&w.invoiceT<=NOW),openAmt=sum(open,w=>w.billed),openCost=sum(open,w=>w.cost);
+  const notInv=c.all.filter(w=>w.invoiceT>NOW);
+  const ag=[['Not yet due',w=>w.dueT>=NOW],['1–30 days overdue',w=>w.dueT<NOW&&w.dueT>=NOW-720],['31–60 days overdue',w=>w.dueT<NOW-720&&w.dueT>=NOW-1440],['Over 60 days overdue',w=>w.dueT<NOW-1440]]
+    .map(([n,f])=>{const a=sum(open.filter(f),w=>w.billed);return [n,a];});
+  const amax=Math.max(...ag.map(a=>a[1]),1);
+  $('#b-cash').innerHTML=`<div class="big3">
+      <div><span class="v">${fmtH(median(comp))}</span><span class="l">technician paid after job completes</span></div>
+      <div><span class="v">${isFinite(median(collected))?Math.round(median(collected))+' days':'–'}</span><span class="l">client pays after job completes</span></div>
+      <div><span class="v">${fmtK(openAmt)}</span><span class="l">open receivables today</span></div></div>
+    <div class="saved"><span class="v">${fmtK(openCost)}</span><span>of technician pay already released on work clients have not paid for yet${notInv.length?` · plus ${fmtK(sum(notInv,w=>w.billed))} not yet invoiced`:''}</span></div>
+    <p class="sub-h">Receivables by age, as of Oct 6</p>
+    <div class="hbars aging">${ag.map(([n,a])=>`<div class="hb wide"><span class="name">${n}</span><span class="t"><div style="width:${a/amax*100}%"></div></span><span class="pct">${fmtK(a)}</span></div>`).join('')}</div>`;
+
+  // lowest-margin jobs
+  const low=c.cur.filter(w=>w.margin<.25).sort((a,b)=>a.margin-b.margin).slice(0,10);
+  $('#b-watch').innerHTML=low.length?`<thead><tr><th>Work order</th><th>Client</th><th>Trade</th><th class="r">Billed</th><th class="r">Tech cost</th><th class="r">Margin</th><th>Review</th></tr></thead><tbody>`+
+    low.map(w=>{const rv=w.pays.find(p=>p.flagged);return `<tr><td><b>${w.id}</b> <span class="l2">${fmtD(w.day)}</span></td><td>${esc(w.client)}</td><td>${w.trade}</td><td class="r">${fmt$(w.billed)}</td><td class="r">${fmt$(w.cost)}</td><td class="r">${mgCell(w.margin)}</td>
+      <td>${rv?(rv.outcome==='adjusted'?'<span class="pill a">Corrected</span>':rv.outcome==='rejected'?'<span class="pill r">Stopped</span>':'<span class="pill w">Approved after review</span>'):'<span class="pill n">Not held</span>'}</td></tr>`;}).join('')+'</tbody>'
+    :`<tbody><tr><td class="empty">No jobs below 25% in this period.</td></tr></tbody>`;
+}
+
+function revChart(el){
+  const c=ctx(),bk=c.bk.map(b=>({rev:0,cost:0}));
+  c.cur.forEach(w=>{const b=bk[c.bi(w.day)];b.rev+=w.billed;b.cost+=w.cost;});
+  bk.forEach(b=>b.mg=b.rev?(b.rev-b.cost)/b.rev:NaN);
+  const W=Math.max(280,el.clientWidth-24),H=340,m={l:52,r:40,t:34,b:26},iw=W-m.l-m.r,topH=176,gap=22,botH=H-m.t-m.b-topH-gap;
+  const ymaxRaw=Math.max(1,...bk.map(b=>b.rev)),st=niceStep(ymaxRaw,4),ymax=Math.ceil(ymaxRaw/st)*st;
+  const bw=iw/bk.length,y=v=>m.t+topH-v/ymax*topH,xc=i=>m.l+bw*(i+.5);
+  let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Billed revenue split into technician cost and gross profit, with gross margin below">`;
+  for(let v=0;v<=ymax+1e-6;v+=st)s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${m.l-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--ink-3)">${fmtAx(v)}</text>`;
+  const barW=Math.max(2,bw*.66);
+  bk.forEach((b,i)=>{const x=xc(i)-barW/2,hc=b.cost/ymax*topH,hg=(b.rev-b.cost)/ymax*topH;
+    s+=`<rect x="${x}" y="${m.t+topH-hc}" width="${barW}" height="${hc}" fill="var(--accent-fill)" opacity=".45"><title>${bkLabel(c,i)}: cost ${fmtK(b.cost)}</title></rect>`;
+    s+=`<rect x="${x}" y="${m.t+topH-hc-hg}" width="${barW}" height="${hg}" rx="1.5" fill="var(--good-fill)"><title>${bkLabel(c,i)}: billed ${fmtK(b.rev)}, gross profit ${fmtK(b.rev-b.cost)}</title></rect>`;});
+  // legend
+  s+=`<rect x="${m.l}" y="8" width="10" height="10" rx="2" fill="var(--good-fill)"/><text x="${m.l+15}" y="17" font-size="11.5" fill="var(--ink-2)">Gross profit</text>`;
+  s+=`<rect x="${m.l+102}" y="8" width="10" height="10" rx="2" fill="var(--accent-fill)" opacity=".45"/><text x="${m.l+117}" y="17" font-size="11.5" fill="var(--ink-2)">Technician cost</text>`;
+  // margin panel 15%–50%
+  const b0=m.t+topH+gap,lo=.15,hi=.5,ym=v=>b0+botH-(Math.min(hi,Math.max(lo,v))-lo)/(hi-lo)*botH;
+  s+=`<rect x="${m.l}" y="${ym(.40)}" width="${iw}" height="${ym(.25)-ym(.40)}" fill="var(--good-soft)"/>`;
+  s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${b0+botH}" y2="${b0+botH}" stroke="var(--grid)"/>`;
+  [.25,.40].forEach(v=>s+=`<text x="${W-m.r+6}" y="${ym(v)+4}" font-size="11" fill="var(--good)">${v*100}%</text>`);
+  s+=`<text x="${m.l-6}" y="${b0+botH/2+4}" text-anchor="end" font-size="11" fill="var(--ink-3)">Margin</text>`;
+  const pts=bk.map((b,i)=>isFinite(b.mg)?[xc(i),ym(b.mg)]:null).filter(Boolean);
+  if(pts.length)s+=`<path d="${pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}" fill="none" stroke="var(--ink)" stroke-width="1.75"/>`;
+  bk.forEach((b,i)=>{if(isFinite(b.mg))s+=`<circle cx="${xc(i)}" cy="${ym(b.mg)}" r="${i===bk.length-1?4:2.5}" fill="${b.mg<.25?'var(--warn-fill)':'var(--ink)'}"><title>${bkLabel(c,i)}: ${fmtP(b.mg)}</title></circle>`;});
+  const lb=bk[bk.length-1];if(lb&&isFinite(lb.mg))s+=`<text x="${xc(bk.length-1)-8}" y="${ym(lb.mg)-8}" text-anchor="end" font-size="11.5" font-weight="600" fill="var(--ink)">${fmtP(lb.mg)}</text>`;
+  const every=Math.ceil(bk.length/Math.max(1,Math.floor(iw/58)));
+  bk.forEach((b,i)=>{if((bk.length-1-i)%every===0)s+=`<text x="${xc(i)}" y="${H-6}" text-anchor="middle" font-size="11" fill="var(--ink-3)">${bkLabel(c,i)}</text>`;});
+  el.innerHTML=s+'</svg>';
+}
+
+function mHist(el){
+  const c=ctx(),vals=c.cur.map(w=>w.margin),N=Math.max(1,vals.length);
+  const W=Math.max(280,el.clientWidth-24),H=340,m={l:36,r:10,t:46,b:28},iw=W-m.l-m.r,ih=H-m.t-m.b;
+  const NB=24,bins=new Array(NB).fill(0);vals.forEach(v=>bins[Math.min(NB-1,Math.max(0,Math.floor(v/.025)))]++);
+  const share=bins.map(b=>b/N*100),ymax=Math.max(5,Math.ceil(Math.max(...share)/5)*5);
+  const bw=iw/NB,x=v=>m.l+v/.6*iw,y=v=>m.t+ih-v/ymax*ih;
+  let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Histogram of gross margin per work order">`;
+  s+=`<rect x="${x(.25)}" y="${m.t}" width="${x(.40)-x(.25)}" height="${ih}" fill="var(--good-soft)"/>`;
+  for(let v=0;v<=ymax;v+=5)s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${m.l-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--ink-3)">${v}%</text>`;
+  share.forEach((v,i)=>{const lo=i*.025,h=ih*v/ymax,col=lo<.25?'var(--warn-fill)':lo<.40?'var(--good-fill)':'var(--accent-fill)';
+    s+=`<rect x="${m.l+i*bw+1}" y="${m.t+ih-h}" width="${Math.max(1,bw-2)}" height="${h}" rx="1.5" fill="${col}"><title>${Math.round(lo*100)}–${Math.round((lo+.025)*1000)/10}% margin: ${v.toFixed(1)}% of jobs</title></rect>`;});
+  for(let v=0;v<=.6001;v+=.1)s+=`<text x="${x(v)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--ink-3)">${Math.round(v*100)}%${v>.59?'+':''}</text>`;
+  const below=vals.filter(v=>v<.25).length/N,inb=vals.filter(v=>v>=.25&&v<=.40).length/N,above=1-below-inb;
+  s+=`<text x="${m.l}" y="14" font-size="11.5" fill="var(--warn)" font-weight="600">Below 25%: ${fmtP(below)}</text>`;
+  s+=`<text x="${m.l}" y="31" font-size="11.5" fill="var(--good)" font-weight="600">Target 25–40%: ${fmtP(inb)}</text>`;
+  s+=`<text x="${W-m.r}" y="14" text-anchor="end" font-size="11.5" fill="var(--accent)" font-weight="600">Above 40%: ${fmtP(above)}</text>`;
+  const md=median(vals);if(isFinite(md))s+=`<line x1="${x(md)}" x2="${x(md)}" y1="${m.t-4}" y2="${m.t+ih}" stroke="var(--ink)" stroke-dasharray="3 3"/><text x="${x(md)+5}" y="${m.t+8}" font-size="11.5" font-weight="600" fill="var(--ink)">Median ${fmtP(md)}</text>`;
+  el.innerHTML=s+'</svg>';
+}
+
+/* ══════════════════ PAYMENTS ══════════════════ */
+function payStats(ps){
+  const paid=ps.filter(p=>p.ctp!=null),ctp=paid.map(p=>p.ctp);
+  return {paid,ctp,med:median(ctp),p90:pct(ctp,.9),in1:ctp.filter(x=>x<=1).length/Math.max(1,ctp.length),in2:ctp.filter(x=>x<=2).length/Math.max(1,ctp.length),
+    total:sum(paid,p=>p.paidAmount),count:paid.length,techs:new Set(paid.map(p=>p.wo.techId)).size};
+}
+function renderPayments(){
+  const c=ctx(),S=payStats(c.pCur),Sp=payStats(c.pPrev),vs=`vs prior ${c.P} d`;
+  $('#p-range').textContent=rangeLabel(c)+' · '+filterText();
+  $('#p-headline').innerHTML=S.count?`Technicians are paid a median of <em>${fmtH(S.med)}</em> after sign-off.`:'No payments match these filters.';
+  const net30=720,net15=360;
+  $('#p-compare').innerHTML=[['Seamless FM',S.med,'ours'],['Net 15 terms',net15,''],['Net 30 terms',net30,'']].map(([n,v,cl])=>`<div class="cmp-row ${cl}"><span>${n}</span><span class="b" style="width:${Math.max(1.2,(v||0)/net30*100)}%"></span><span class="v">${v<48?fmtH(v):Math.round(v/24)+' days'}</span></div>`).join('');
+  const mo=30/c.P;
+  $('#p-kpis').innerHTML=[
+    kpi('Median sign-off → paid',hUnit(S.med),`${delta(S.med,Sp.med,false)} half of payments, faster`,'hero'),
+    kpi('90th percentile',hUnit(S.p90),`${delta(S.p90,Sp.p90,false)} 9 in 10 paid within`),
+    kpi('Paid within 1 h',(S.in1*100).toFixed(1)+'<small>%</small>',`${delta(S.in1,Sp.in1,true,'pp')} ${(S.in2*100).toFixed(1)}% within 2 h`),
+    kpi('Paid to technicians',fmtK(S.total),`${delta(S.total,Sp.total,true)} ${vs}`),
+    kpi('Payments released',fmtN(S.count),`${delta(S.count,Sp.count,true)} ≈ ${fmtN(S.count*mo)} / month`),
+    kpi('Technicians paid',fmtN(S.techs),`${fmt$(S.total/Math.max(1,S.techs))} each on average`)
+  ].join('');
+
+  // where the time goes
+  const auto=S.paid.filter(p=>!p.flagged),rev=S.paid.filter(p=>p.flagged);
+  function lane(name,rows,withReview){
+    if(!rows.length)return '';
+    const parts=[['Sign-off & photos','s-raise',median(rows.map(p=>p.raise))],['Checks','s-check',median(rows.map(p=>p.verify))]];
+    if(withReview)parts.push(['Human review','s-review',median(rows.map(p=>p.review))]);
+    parts.push(['AP → bank → paid','s-release',median(rows.map(p=>p.release))]);
+    const tot=parts.reduce((a,b)=>a+b[2],0);
+    return `<div class="lane"><div class="lane-h"><span><b>${name}</b> · ${Math.round(rows.length/S.paid.length*100)}% of payments</span><span class="tot">${fmtH(median(rows.map(p=>p.ctp)))}</span></div>
+      <div class="stack" aria-hidden="true">${parts.map(p=>`<div class="${p[1]}" style="flex:${p[2]/tot}"></div>`).join('')}</div>
+      <div class="lane-key">${parts.map(p=>`<span><i class="${p[1]}"></i>${p[0]} <b>${fmtH(p[2])}</b></span>`).join('')}</div></div>`;
+  }
+  $('#lanes').innerHTML=lane('Auto-verified',auto,false)+lane('Held for human review',rev,true)+
+    `<p style="margin:14px 0 0;font-size:12.5px;color:var(--ink-2);max-width:60ch">Most payments pass every automatic check and go straight to release. The rest get a second look from AP before any money moves. Jobs whose cost puts margin under 25% are held automatically.</p>`;
+
+  // review panel
+  const flagged=c.pCur.filter(p=>p.flagged),FL=Math.max(1,flagged.length);
+  const out={approved:0,adjusted:0,rejected:0};flagged.forEach(p=>out[p.outcome]++);
+  const saved=sum(flagged,p=>p.amount-p.paidAmount);
+  const rc={};flagged.forEach(p=>p.reasons.forEach(x=>rc[x]=(rc[x]||0)+1));
+  const rs=Object.entries(rc).sort((a,b)=>b[1]-a[1]);const rmax=rs.length?rs[0][1]:1;
+  $('#review').innerHTML=`<div class="big3">
+      <div><span class="v">${(flagged.length/Math.max(1,c.pCur.length)*100).toFixed(1)}%</span><span class="l">of payments held</span></div>
+      <div><span class="v">${fmtH(median(flagged.map(p=>p.review)))}</span><span class="l">median time to decide</span></div>
+      <div><span class="v">${fmtN(flagged.length)}</span><span class="l">reviews completed</span></div></div>
+    <div class="saved"><span class="v">${fmtK(saved)}</span><span>in overbilling and duplicates stopped before payout</span></div>
+    <p class="sub-h">Outcome</p>
+    <div class="hbars">${[['Approved as submitted',out.approved,'g'],['Corrected, then paid',out.adjusted,'a'],['Stopped',out.rejected,'r']].map(([n,v,cl])=>
+      `<div class="hb"><span class="name">${n}</span><span class="t"><div class="${cl}" style="width:${v/FL*100}%"></div></span><span class="pct">${Math.round(v/FL*100)}%</span></div>`).join('')}</div>
+    <p class="sub-h">Why payments were held</p>
+    <div class="hbars">${rs.map(([n,v])=>`<div class="hb"><span class="name">${n}</span><span class="t"><div style="width:${v/rmax*100}%"></div></span><span class="pct">${fmtN(v)}</span></div>`).join('')}</div>`;
+
+  // structure: payments per work order and payment types
+  const wos=c.cur,NW=Math.max(1,wos.length),cnt=[0,0,0,0];wos.forEach(w=>cnt[w.pays.length]++);
+  const types=PTYPES.map(t=>{const ps=S.paid.filter(p=>p.type===t);return {t,n:ps.length,avg:sum(ps,p=>p.paidAmount)/Math.max(1,ps.length),amt:sum(ps,p=>p.paidAmount),med:median(ps.map(p=>p.ctp))};});
+  const ppj=sum(wos,w=>w.pays.length)/NW;
+  $('#structure').innerHTML=`<div class="big3">
+      <div><span class="v">${ppj.toFixed(2)}</span><span class="l">payments per work order</span></div>
+      <div><span class="v">${fmt$(S.total/Math.max(1,S.count))}</span><span class="l">average payment</span></div>
+      <div><span class="v">${fmtN(S.count*mo)}</span><span class="l">payments a month at this pace</span></div></div>
+    <p class="sub-h">Work orders by number of payments</p>
+    <div class="hbars">${[1,2,3].map(k=>`<div class="hb"><span class="name">${k} payment${k>1?'s':''}</span><span class="t"><div class="a" style="width:${cnt[k]/NW*100}%"></div></span><span class="pct">${Math.round(cnt[k]/NW*100)}%</span></div>`).join('')}</div>
+    <p class="sub-h">Payment types</p>
+    <div class="tbl-wrap"><table><thead><tr><th style="padding-left:0">Type</th><th class="r">Payments</th><th class="r">Average</th><th class="r">Share of $</th><th class="r">Median to paid</th></tr></thead><tbody>
+    ${types.map(x=>`<tr><td style="padding-left:0">${x.t}</td><td class="r">${fmtN(x.n)}</td><td class="r">${fmt$(x.avg)}</td><td class="r">${fmtP(x.amt/Math.max(1,S.total),0)}</td><td class="r">${fmtH(x.med)}</td></tr>`).join('')}</tbody></table></div>`;
+
+  // methods
+  const ms=METHODS.map(M=>{const rows=S.paid.filter(p=>p.method===M.name);return {n:M.name,share:rows.length/Math.max(1,S.paid.length),m:median(rows.map(p=>p.ctp))};});
+  $('#methods').innerHTML=`<p class="sub-h">Payout method · share and median time</p><div class="hbars">${ms.map(x=>`<div class="hb wide"><span class="name">${x.n}</span><span class="t"><div class="a" style="width:${x.share*100}%"></div></span><span class="pct">${Math.round(x.share*100)}% · ${fmtH(x.m)}</span></div>`).join('')}</div>
+    <p style="margin:0;font-size:12.5px;color:var(--ink-2);max-width:60ch">Every payment goes out instantly. Technicians choose how they want to be paid when they join our network, and can change it at any time.</p>`;
+
+  // by trade
+  const tr=TRADES.map(T=>{const rows=S.paid.filter(p=>p.wo.trade===T.name);return {n:T.name,c:rows.length,s:sum(rows,p=>p.paidAmount),m:median(rows.map(p=>p.ctp)),w:rows.filter(p=>p.ctp<=1).length/Math.max(1,rows.length),h:rows.filter(p=>p.flagged).length/Math.max(1,rows.length)};}).filter(x=>x.c).sort((a,b)=>b.c-a.c);
+  $('#trades').innerHTML=`<thead><tr><th>Trade</th><th class="r">Payments</th><th class="r">Paid out</th><th class="r">Median</th><th class="r">Held</th><th class="r">Within 1 h</th></tr></thead><tbody>`+
+    tr.map(x=>`<tr><td>${x.n}</td><td class="r">${fmtN(x.c)}</td><td class="r">${fmtK(x.s)}</td><td class="r">${fmtH(x.m)}</td><td class="r">${fmtP(x.h)}</td><td class="r">${(x.w*100).toFixed(1)}%<span class="mini"><i style="width:${x.w*100}%"></i></span></td></tr>`).join('')+'</tbody>';
+
+  // top technicians
+  const tm=new Map();S.paid.forEach(p=>{let t=tm.get(p.wo.techId);if(!t){t={id:p.wo.techId,name:p.wo.tech,wos:new Set(),paid:0,held:0,n:0,trades:{}};tm.set(p.wo.techId,t);}t.wos.add(p.wo);t.paid+=p.paidAmount;t.n++;if(p.flagged)t.held++;t.trades[p.wo.trade]=(t.trades[p.wo.trade]||0)+1;});
+  const top=[...tm.values()].sort((a,b)=>b.paid-a.paid).slice(0,10);
+  $('#techs').innerHTML=`<thead><tr><th>Technician</th><th class="r">Jobs</th><th class="r">Payments</th><th class="r">Paid</th><th class="r">Job margin</th><th class="r">Held</th></tr></thead><tbody>`+
+    top.map(t=>{const ws=[...t.wos],b=biz(ws),tt=Object.entries(t.trades).sort((a,b)=>b[1]-a[1])[0][0];
+      return `<tr><td>${t.name} <span class="l2">#${String(t.id).padStart(4,'0')} · ${tt}</span></td><td class="r">${fmtN(ws.length)}</td><td class="r">${fmtN(t.n)}</td><td class="r">${fmtK(t.paid)}</td><td class="r">${mgCell(b.mg)}</td><td class="r">${t.held}</td></tr>`;}).join('')+'</tbody>';
+
+  histogram($('#c-hist'),S);trend($('#c-trend'));heat($('#c-heat'),S.paid);
+}
+
+function histogram(el,S){
+  const ctpAll=S.ctp,N=Math.max(1,ctpAll.length);
+  const W=Math.max(280,el.clientWidth-24),H=230,m={l:36,r:10,t:40,b:28},iw=W-m.l-m.r,ih=H-m.t-m.b;
+  const NB=19,bins=new Array(NB).fill(0);ctpAll.forEach(v=>bins[Math.min(NB-1,Math.floor(v*6))]++);
+  const share=bins.map(b=>b/N*100);const ymax=Math.max(5,Math.ceil(Math.max(...share)/5)*5);
+  const bw=iw/NB,y=v=>m.t+ih-v/ymax*ih,x=mn=>m.l+Math.min(mn,180)/10*bw;
+  let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Histogram of minutes from sign-off to technician paid">`;
+  for(let v=0;v<=ymax;v+=5){s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${m.l-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--ink-3)">${v}%</text>`;}
+  share.forEach((v,i)=>{const h=ih*v/ymax;s+=`<rect x="${m.l+i*bw+1}" y="${m.t+ih-h}" width="${Math.max(1,bw-2)}" height="${h}" rx="1.5" fill="${i<6?'var(--good-fill)':'var(--accent-fill)'}" opacity="${i<6?1:.6}"/>`;});
+  const step=W<480?60:30;
+  for(let mn=0;mn<=180;mn+=step){s+=`<text x="${x(mn)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--ink-3)">${mn===180?'3 h+':mn<60?mn+' min':mn/60+' h'}</text>`;}
+  if(isFinite(S.med))[[S.med,'Median '+fmtH(S.med),m.t-24],[S.p90,'90th pct '+fmtH(S.p90),m.t-8]].forEach(([v,l,ty])=>{
+    s+=`<line x1="${x(v*60)}" x2="${x(v*60)}" y1="${ty+4}" y2="${m.t+ih}" stroke="var(--ink)" stroke-dasharray="3 3" stroke-width="1"/><text x="${x(v*60)+5}" y="${ty+1}" font-size="11.5" font-weight="600" fill="var(--ink)">${l}</text>`;});
+  s+=`<text x="${W-m.r}" y="${m.t+12}" text-anchor="end" font-size="11" fill="var(--ink-3)">Green bars: paid within the hour</text>`;
+  el.innerHTML=s+'</svg>';
+}
+function trend(el){
+  const c=ctx(),groups=c.bk.map(()=>[]);
+  c.pCur.forEach(p=>{if(p.ctp!=null)groups[c.bi(p.day)].push(p.ctp*60);});
+  const pts=groups.map((g,i)=>({i,med:median(g),p90:pct(g,.9)})).filter(p=>isFinite(p.med));
+  $('#trend-meta').textContent=(c.size===1?'Per day':'Per week')+' · minutes, sign-off → paid';
+  const W=Math.max(280,el.clientWidth-24),H=230,m={l:52,r:14,t:26,b:28},iw=W-m.l-m.r,ih=H-m.t-m.b;
+  if(!pts.length){el.innerHTML='<p class="empty">No payments in this period.</p>';return;}
+  const n=c.bk.length,ymax=Math.ceil(Math.max(...pts.map(w=>w.p90))/15)*15,x=i=>m.l+(n===1?iw/2:i/(n-1)*iw),y=v=>m.t+ih-v/ymax*ih;
+  let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Median and 90th percentile minutes to payment over time">`;
+  for(let v=0;v<=ymax;v+=15){s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${m.l-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--ink-3)">${v} min</text>`;}
+  const ln=k=>pts.map((w,j)=>(j?'L':'M')+x(w.i).toFixed(1)+' '+y(w[k]).toFixed(1)).join(' ');
+  const L=pts[pts.length-1],F0=pts[0];
+  s+=`<path d="${ln('med')} L${x(L.i)} ${m.t+ih} L${x(F0.i)} ${m.t+ih} Z" fill="var(--good-soft)"/>`;
+  s+=`<path d="${ln('p90')}" fill="none" stroke="var(--ink-3)" stroke-width="1.5" stroke-dasharray="4 4"/>`;
+  s+=`<path d="${ln('med')}" fill="none" stroke="var(--good-fill)" stroke-width="2.25"/>`;
+  s+=`<circle cx="${x(L.i)}" cy="${y(L.med)}" r="4" fill="var(--good-fill)"/><circle cx="${x(L.i)}" cy="${y(L.p90)}" r="3" fill="var(--ink-3)"/>`;
+  s+=`<text x="${x(L.i)-8}" y="${y(L.med)-10}" text-anchor="end" font-size="11.5" font-weight="600" fill="var(--good)">Median ${fmtH(L.med/60)}</text>`;
+  s+=`<text x="${x(L.i)-8}" y="${Math.min(m.t+ih-4,y(L.p90)+16)}" text-anchor="end" font-size="11" fill="var(--ink-2)">90th pct ${fmtH(L.p90/60)}</text>`;
+  const every=Math.ceil(n/Math.max(1,Math.floor(iw/58)));
+  c.bk.forEach((b,i)=>{if((n-1-i)%every===0)s+=`<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--ink-3)">${bkLabel(c,i)}</text>`;});
+  const ch=1-L.med/F0.med;
+  s+=`<text x="${m.l}" y="14" font-size="11.5" fill="var(--ink-2)">Median ${ch>=0?'down':'up'} <tspan font-weight="700" fill="${ch>=0?'var(--good)':'var(--danger)'}">${Math.abs(Math.round(ch*100))}%</tspan> since ${bkLabel(c,F0.i)}</text>`;
+  el.innerHTML=s+'</svg>';
+}
+function heat(el,paid){
+  const g=Array.from({length:7},()=>new Array(24).fill(0));
+  paid.forEach(p=>{const d=Math.floor(p.tPaid/24),dow=(dDate(d).getDay()+6)%7,h=Math.floor(p.tPaid-d*24);g[dow][Math.min(23,h)]++;});
+  const max=Math.max(1,...g.flat()),days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const W=Math.max(280,el.clientWidth-24),m={l:34,r:6,t:6,b:22},cw=(W-m.l-m.r)/24,chh=18,H=m.t+chh*7+m.b;
+  let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Payments released by weekday and hour">`;
+  g.forEach((row,r)=>{s+=`<text x="${m.l-6}" y="${m.t+r*chh+13}" text-anchor="end" font-size="11" fill="var(--ink-3)">${days[r]}</text>`;
+    row.forEach((v,h)=>{s+=`<rect x="${m.l+h*cw+1}" y="${m.t+r*chh+1}" width="${Math.max(1,cw-2)}" height="${chh-2}" rx="2" fill="${v?'var(--accent-fill)':'var(--track)'}" opacity="${v?(.12+.88*v/max).toFixed(2):1}"><title>${days[r]} ${clockStr(h)}: ${fmtN(v)} payments</title></rect>`;});});
+  [0,6,12,18].forEach(h=>s+=`<text x="${m.l+h*cw}" y="${H-6}" font-size="11" fill="var(--ink-3)">${h===0?'12 AM':h===12?'12 PM':h<12?h+' AM':(h-12)+' PM'}</text>`);
+  el.innerHTML=s+'</svg>';
+}
+
+/* ══════════════════ WORK ORDERS LEDGER ══════════════════ */
+const LCHIPS=[['all','All'],['held','Held for review'],['floor','Below 25% margin'],['multi','2+ payments'],['overdue','Client overdue'],['open','Payment in progress']];
+const L={q:'',chip:'all',show:40,open:null};
+function payStatus(p){if(p.tPaid==null)return ['Stopped','r'];if(p.tPaid>NOW)return ['Releasing','a'];if(p.outcome==='adjusted')return ['Corrected, paid','a'];if(p.flagged)return ['Paid after review','w'];return ['Paid','g'];}
+function chipTest(k,w){
+  if(k==='held')return w.flagged;if(k==='floor')return w.margin<.25;if(k==='multi')return w.pays.length>1;
+  if(k==='overdue')return w.collectT>NOW&&w.dueT<NOW;if(k==='open')return w.pays.some(p=>p.tPaid!=null&&p.tPaid>NOW);return true;}
+function invCell(w){
+  if(w.invoiceT>NOW)return '<span class="pill n">Invoicing</span>';
+  if(w.collectT<=NOW)return `<span class="pill g">Collected ${fmtD(Math.floor(w.collectT/24))}</span>`;
+  const d=Math.round((NOW-w.dueT)/24);return d>0?`<span class="pill r">${d} d overdue</span>`:`<span class="pill n">Due in ${-d} d</span>`;}
+function renderLedger(){
+  const c=ctx(),q=L.q.trim().toLowerCase();
+  const base=c.cur.filter(w=>!q||(w.id+' '+w.tech+' '+w.client+' '+w.site+' '+w.trade+' '+w.city).toLowerCase().includes(q));
+  $('#l-chips').innerHTML=LCHIPS.map(([k,n])=>`<button type="button" class="chipf" data-k="${k}" aria-pressed="${L.chip===k}">${n}<b>${fmtN(base.filter(w=>chipTest(k,w)).length)}</b></button>`).join('');
+  const rows=base.filter(w=>chipTest(L.chip,w)).sort((a,b)=>b.tClose-a.tClose);
+  $('#l-count').textContent=`Showing ${fmtN(Math.min(L.show,rows.length))} of ${fmtN(rows.length)} work orders · ${rangeLabel(c)}`;
+  const head=`<thead><tr><th>Work order</th><th>Closed</th><th>Client · site</th><th>Trade</th><th>Technician</th><th class="r">Billed</th><th class="r">Tech cost</th><th class="r">Margin</th><th>Payments</th><th>Client invoice</th></tr></thead>`;
+  if(!rows.length){$('#ledger').innerHTML=head+'<tbody><tr><td colspan="10" class="empty">No work orders match. Clear the search or pick another filter.</td></tr></tbody>';$('#l-more').innerHTML='';return;}
+  $('#ledger').innerHTML=head+'<tbody>'+rows.slice(0,L.show).map(w=>{
+    const open=L.open===w.id;
+    const dots=w.pays.map(p=>{const[t,cl]=payStatus(p);return `<i class="${cl==='g'?'':cl}" title="${p.type}: ${t}"></i>`;}).join('');
+    return `<tr class="row${open?' open':''}" data-id="${w.id}" tabindex="0" aria-expanded="${open}"><td><b><span class="car" aria-hidden="true">›</span> ${w.id}</b></td><td>${fmtDT(w.tClose)}</td><td>${esc(w.client)} <span class="l2">${w.site}</span></td><td>${w.trade}</td><td>${w.tech}</td>
+      <td class="r">${fmt$(w.billed)}</td><td class="r">${fmt$(w.cost)}</td><td class="r">${mgCell(w.margin)}</td><td>${w.pays.length}<span class="pd-dots">${dots}</span></td><td>${invCell(w)}</td></tr>`+(open?detailRow(w):'');
+  }).join('')+'</tbody>';
+  $('#l-more').innerHTML=rows.length>L.show?`<button type="button" class="btn" id="l-morebtn">Show ${Math.min(40,rows.length-L.show)} more</button>`:'';
+}
+function detailRow(w){
+  const pays=w.pays.map(p=>{const[t,cl]=payStatus(p);
+    const rv=p.flagged?`<div>Held: <b>${p.reasons.join(', ')}</b> · reviewed by ${p.reviewer} in ${fmtH(p.review)}${p.outcome==='adjusted'?` · corrected ${fmt$(p.amount)} → ${fmt$(p.paidAmount)}`:p.outcome==='rejected'?' · payment stopped':''}</div>`:'';
+    return `<div class="pay"><div class="top"><b>${p.idx} of ${p.of} · ${p.type}</b><span class="pill ${cl}">${t}</span><span class="amt">${p.outcome==='adjusted'?`<s>${usd2.format(p.amount)}</s>`:''}${usd2.format(p.paidAmount)}</span></div>
+      <div>Signed off ${fmtDT(p.tTrigger)}${p.tPaid!=null?` → ${p.tPaid>NOW?'expected':'paid'} ${fmtDT(p.tPaid)} <b>(${fmtH(p.ctp)})</b>`:''} · ${p.method}</div>${rv}</div>`;}).join('');
+  const adj=w.quoted-w.cost;
+  const inv=w.invoiceT>NOW?'Not invoiced yet':w.collectT<=NOW?`Collected ${fmtD(Math.floor(w.collectT/24))} · ${Math.round((w.collectT-w.invoiceT)/24)} days after invoice`:(w.dueT<NOW?`${Math.round((NOW-w.dueT)/24)} days overdue`:`Due ${fmtD(Math.floor(w.dueT/24))}`);
+  return `<tr class="detail"><td colspan="10"><div class="det">
+    <div><h4>Payments to ${w.tech}</h4><div class="pays">${pays}</div></div>
+    <div><h4>Job economics</h4><div class="kv"><span>Billed to client</span><b>${usd2.format(w.billed)}</b><span>Technician cost as quoted</span><b>${usd2.format(w.quoted)}</b>
+      ${adj?`<span>Review corrections</span><b>−${usd2.format(adj)}</b>`:''}<span>Technician cost paid</span><b>${usd2.format(w.cost)}</b>
+      <span class="tot">Gross profit</span><b class="tot">${usd2.format(w.gp)}</b><span>Gross margin</span><b>${mgCell(w.margin)}</b></div></div>
+    <div><h4>Client invoice</h4><div class="kv"><span>Client</span><b>${esc(w.client)}</b><span>Site</span><b>${w.site} · ${w.city}</b><span>Invoiced</span><b>${w.invoiceT>NOW?'–':fmtD(Math.floor(w.invoiceT/24))}</b>
+      <span>Terms</span><b>Net ${w.terms}</b><span>Status</span><b>${inv}</b><span>Cash fronted</span><b>${w.collectT>NOW?usd2.format(w.cost):'Settled'}</b></div></div>
+  </div></td></tr>`;
+}
+$('#l-q').addEventListener('input',e=>{L.q=e.target.value;L.show=40;renderLedger();});
+$('#l-chips').addEventListener('click',e=>{const b=e.target.closest('.chipf');if(!b)return;L.chip=b.dataset.k;L.show=40;renderLedger();});
+$('#ledger').addEventListener('click',e=>{const tr=e.target.closest('tr.row');if(!tr)return;L.open=L.open===tr.dataset.id?null:tr.dataset.id;renderLedger();const n=document.querySelector(`tr.row[data-id="${tr.dataset.id}"]`);if(n)n.focus();});
+$('#ledger').addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const tr=e.target.closest('tr.row');if(!tr)return;e.preventDefault();tr.click();});
+$('#l-more').addEventListener('click',e=>{if(e.target.id==='l-morebtn'){L.show+=40;renderLedger();}});
+
+/* ── filters + tabs ── */
+let view='live';
+function renderView(){if(view==='business')renderBusiness();if(view==='payments')renderPayments();if(view==='ledger')renderLedger();
+  if(view!=='live'){const c=ctx();$('#f-note').innerHTML=`<b>${fmtN(c.cur.length)}</b> work orders · <b>${fmtN(c.pCur.length)}</b> payments in view`;}}
+function setFilter(k,v){F[k]=v;CTX=null;L.open=null;L.show=40;renderView();}
+$('#f-period').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('#f-period button').forEach(x=>x.setAttribute('aria-pressed',x===b));setFilter('P',+b.dataset.p);});
+$('#f-trade').addEventListener('change',e=>setFilter('trade',e.target.value));
+$('#f-region').addEventListener('change',e=>setFilter('region',e.target.value));
+$('#f-client').addEventListener('change',e=>setFilter('client',e.target.value));
+
+const VIEWS=['live','business','payments','ledger'];
+function select(which){
+  view=which;
+  VIEWS.forEach(v=>{$('#tab-'+v).setAttribute('aria-selected',v===which);$('#view-'+v).hidden=v!==which;});
+  $('#filters').hidden=which==='live';
+  renderView();
+}
+VIEWS.forEach(v=>$('#tab-'+v).addEventListener('click',()=>select(v)));
+document.querySelector('.tabs').addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;const i=VIEWS.indexOf(view),n=VIEWS[(i+(e.key==='ArrowRight'?1:VIEWS.length-1))%VIEWS.length];select(n);$('#tab-'+n).focus();});
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(view==='business'){revChart($('#c-rev'));mHist($('#c-mhist'));}if(view==='payments')renderPayments();},120);});
+const h=location.hash.slice(1);if(h==='analytics')select('payments');else if(VIEWS.includes(h))select(h);
+})();
+</script>
+
+</body>
+</html>
