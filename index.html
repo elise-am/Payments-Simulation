@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Simulated Seamless FM dashboard: live payout journey, business margins, payment speed and work-order ledger.">
+<meta name="description" content="Simulated Seamless FM dashboard: live payout journey, how fast technicians are paid, and the work-order ledger.">
 <title>Seamless Technician Payouts</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700;800&display=swap">
@@ -415,21 +415,18 @@ th.r,td.r{text-align:right;font-variant-numeric:tabular-nums}
 .prior b{color:var(--ink)}
 .flow .who span.ty{color:var(--accent)}
 
-.gauge{display:flex;flex-direction:column;gap:6px;min-width:min(100%,340px)}
+.gauge{display:flex;flex-direction:column;gap:6px;min-width:min(100%,360px)}
 .gauge .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
-.gauge .trk{position:relative;height:14px;border-radius:3px;background:var(--track)}
-.gauge .band{position:absolute;top:0;bottom:0;background:var(--good-soft);border-left:2px solid var(--good-fill);border-right:2px solid var(--good-fill)}
-.gauge .mk{position:absolute;top:-5px;bottom:-5px;width:3px;margin-left:-1.5px;border-radius:2px;background:var(--ink)}
-.gauge .ax{position:relative;height:14px;font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
-.gauge .ax span{position:absolute;transform:translateX(-50%)}
-.gauge .note{font-size:12.5px;color:var(--ink-2)}
-.gauge .note b{color:var(--ink)}
+.split{display:flex;height:14px;border-radius:3px;overflow:hidden;gap:2px}
+.split i{display:block;min-width:2px}
+.k1{background:var(--good-fill)} .k2{background:var(--accent-fill)} .k3{background:var(--warn-fill)} .k4{background:var(--danger-fill)}
+.split-key{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink-2)}
+.split-key span{display:inline-flex;align-items:center;gap:6px}
+.split-key i{width:9px;height:9px;border-radius:2px;display:inline-block}
+.split-key b{color:var(--ink);font-variant-numeric:tabular-nums}
 
-.mg{font-variant-numeric:tabular-nums;font-weight:600}
-.mg.lo{color:var(--warn)} .mg.ok{color:var(--good)} .mg.hi{color:var(--accent)}
-.mbar{position:relative;display:inline-block;width:72px;height:8px;background:var(--track);border-radius:2px;vertical-align:middle;margin-left:8px}
-.mbar .bd{position:absolute;top:0;bottom:0;left:41.67%;width:25%;background:var(--good-soft)}
-.mbar .pt{position:absolute;top:-3px;bottom:-3px;width:3px;margin-left:-1.5px;border-radius:1px;background:var(--ink)}
+.wait{font-variant-numeric:tabular-nums;font-weight:600}
+.wait.ok{color:var(--good)} .wait.slow{color:var(--warn)}
 td.l2{color:var(--ink-3);font-size:12px}
 .foot-note{margin:0;padding:10px 16px 14px;font-size:12.5px;color:var(--ink-2);max-width:70ch}
 .aging .hb .t div{background:var(--accent-fill)}
@@ -612,13 +609,13 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
         </div>
         <div class="gauge" id="b-gauge"></div>
       </div>
-      <p class="sub-h">Business</p>
-      <div class="kpis" id="b-kpis"></div>
-      <p class="sub-h">Technician payments</p>
+      <p class="sub-h">Speed</p>
       <div class="kpis" id="p-kpis"></div>
+      <p class="sub-h">Volume</p>
+      <div class="kpis" id="b-kpis"></div>
       <div class="panel">
-        <div class="panel-h"><h2>Billed, cost and margin</h2><span class="meta" id="b-rev-meta"></span></div>
-        <div class="chart" id="c-rev"></div>
+        <div class="panel-h"><h2>How long technicians waited, over time</h2><span class="meta" id="sla-meta"></span></div>
+        <div class="chart" id="c-sla"></div>
       </div>
     </div>
 
@@ -660,6 +657,30 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
           <div class="pd" id="methods" style="padding-top:4px"></div>
         </div>
       </div>
+      <div class="grid2 even">
+        <div class="panel">
+          <div class="panel-h"><h2>Share paid within…</h2><span class="meta">Cumulative share of payments by wait</span></div>
+          <div class="chart" id="c-cdf"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><h2>Speed by sign-off time</h2><span class="meta">Median wait by the hour the job was signed off</span></div>
+          <div class="chart" id="c-hour"></div>
+        </div>
+      </div>
+      <div class="grid2 even">
+        <div class="panel">
+          <div class="panel-h"><h2>By state</h2><span class="meta">How fast technicians are paid in each state</span></div>
+          <div class="tbl-wrap"><table id="states"></table></div>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><h2>By payment type</h2><span class="meta">Trip, parts and completion payments</span></div>
+          <div class="tbl-wrap"><table id="ptypes"></table></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h2>Longest waits</h2><span class="meta">Slowest payments in the period</span></div>
+        <div class="tbl-wrap"><table id="slow"></table></div>
+      </div>
       <div class="panel">
         <div class="panel-h"><h2>Payments per work order</h2><span class="meta">Trip, parts and completion payments</span></div>
         <div class="pd" id="structure"></div>
@@ -685,6 +706,10 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
       <div class="panel">
         <div class="panel-h"><h2>Top technicians</h2><span class="meta">By amount paid in the period</span></div>
         <div class="tbl-wrap"><table id="techs"></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h2>Technicians waiting longest</h2><span class="meta">Highest median wait, technicians with 3+ payments</span></div>
+        <div class="tbl-wrap"><table id="techs-slow"></table></div>
       </div>
     </div>
 
@@ -751,7 +776,7 @@ const REGIONS={Northeast:'CT ME MA NH RI VT NJ NY PA',Midwest:'IL IN MI OH WI IA
 const REGION_OF={};for(const[r,list]of Object.entries(REGIONS))for(const s of list.split(' '))REGION_OF[s]=r;
 const METHODS=[{name:'Instant bank transfer',w:71},{name:'Instant to debit card',w:29}];
 const REASONS=[{name:'Above quoted cost',w:30},{name:'First payment to payee',w:22},{name:'Receipt missing',w:18},{name:'Alternate recipient',w:12},{name:'Possible duplicate',w:7},{name:'Rate above vendor card',w:5}];
-const FLOOR='Margin below 25% floor';
+const FLOOR='Above quoted cost';
 const PTYPES=['Trip & diagnostic','Parts advance','Completion'];
 const REVIEWERS=['Dana K.','Luis M.','Priya S.'];
 const FIRST=['Marcus','Andre','Jose','Tyler','Dwayne','Carlos','Kevin','Luis','Brandon','Terrence','Miguel','Ryan','Jamal','Derek','Hector','Sean','Victor','Darnell','Eric','Ramon','Travis','Omar','Cody','Jorge','Reggie','Nate','Angel','Wes','Isaac','Malik'];
@@ -801,7 +826,7 @@ function makeWO(r,d,tClose,trend,seq,pays){
     p.ctp=p.tPaid==null?null:p.tPaid-trig[j];
     p.wo=w;w.pays.push(p);if(p.day>=0)pays.push(p);
   });
-  w.cost=sum(w.pays,p=>p.paidAmount);w.gp=w.billed-w.cost;w.margin=w.gp/w.billed;
+  w.cost=sum(w.pays,p=>p.paidAmount);
   w.flagged=w.pays.some(p=>p.flagged);
   w.invoiceT=tClose+12+r()*36;w.dueT=w.invoiceT+C.terms*24;
   const late=r()<C.late?8+r()*40:0;
@@ -826,7 +851,6 @@ const usd0=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximu
 const usd2=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2});
 function fmt$(n){return usd0.format(n);}
 function fmtK(n){return n>=1e6?'$'+(n/1e6).toFixed(2)+'M':n>=1e4?'$'+(n/1e3).toFixed(1)+'k':fmt$(n);}
-function fmtAx(n){return n>=1e6?'$'+(n/1e6).toFixed(n%1e6?1:0)+'M':n>=1e3?'$'+Math.round(n/1e3)+'k':'$'+n;}
 function fmtN(n){return Math.round(n).toLocaleString('en-US');}
 function fmtP(x,d=1){return isFinite(x)?(x*100).toFixed(d)+'%':'–';}
 function fmtH(h){if(!isFinite(h))return '–';if(h<1)return Math.round(h*60)+' min';return h.toFixed(1)+' h';}
@@ -838,8 +862,9 @@ function fmtD(d){return dDate(d).toLocaleDateString('en-US',{month:'short',day:'
 function fmtDT(t){return fmtD(Math.floor(t/24))+', '+clockStr(t);}
 function ic(id,cls){return `<svg class="i${cls?' '+cls:''}"><use href="#i-${id}"/></svg>`;}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
-function mgCls(m){return m<.25?'lo':m>.40?'hi':'ok';}
-function mgCell(m,bar){return `<span class="mg ${mgCls(m)}">${fmtP(m)}</span>${bar?`<span class="mbar" aria-hidden="true"><span class="bd"></span><span class="pt" style="left:${Math.min(100,Math.max(0,m/.6*100))}%"></span></span>`:''}`;}
+// wait in hours, colored: within 1 h good, over 2 h slow
+function waitCell(h){return isFinite(h)?`<span class="wait ${h<=1?'ok':h>2?'slow':''}">${fmtH(h)}</span>`:'–';}
+function miniBar(x){return `${(x*100).toFixed(1)}%<span class="mini"><i style="width:${x*100}%"></i></span>`;}
 
 /* ══════════════════ LIVE: ONE PAYMENT'S JOURNEY ══════════════════ */
 const DEPTS=[{n:'Field',span:3},{n:'Operations',span:2},{n:'Accounts Payable',span:1},{n:'Bank',span:1},{n:'Technician',span:1}];
@@ -887,7 +912,7 @@ function newJourney(){
   const cum=[];mins.reduce((a,b,i)=>(cum[i]=a+b),0);
   const durs=STEPS.map(s=>s.dur+(s.key==='review'&&hiccup?3800:0));
   const starts=[];durs.reduce((a,b,i)=>(starts[i]=a,a+b),0);
-  J={job,tech,first,hiccup,client,billed,cost,margin:(billed-cost)/billed,types,earlier,amount,cum,durs,starts,total:starts[7]+durs[7],
+  J={job,tech,first,hiccup,client,billed,cost,types,earlier,amount,cum,durs,starts,total:starts[7]+durs[7],
     wo:'WO-'+(65213+jCount*37),site:client.pre+(1142+jCount*311)%3000,city:CITIES[(jCount*5)%CITIES.length],
     signer:SIGNERS[jCount%SIGNERS.length],ops:OPS[jCount%OPS.length],ap:APS[jCount%APS.length],
     start:nowHours(),ref:'PAY-'+(180700+jCount*13)};
@@ -937,7 +962,7 @@ function enterStep(i){
   if(s.key==='photos')h=head('Field','After photos submitted',`${J.first} uploads proof of the finished work from the job site.`)+tilesHTML();
   if(s.key==='review')h=head('Operations','Operations reviews the photos','Every photo is checked by a person before payment is released.')+tilesHTML()+
     `<div class="flagnote" id="flagnote">${ic('alert')}${J.job.photos[1]} photo is blurry. Retake requested from ${J.first}.</div>
-     <div class="reviewer">Reviewed by <b>${J.ops}</b>, Operations · Invoice cost checked against quote: <b>${fmtP(J.margin)} margin</b>, inside the 25–40% target</div><div class="allok" id="allok">${ic('check')}All photos approved</div>`;
+     <div class="reviewer">Reviewed by <b>${J.ops}</b>, Operations · Invoice cost checked against the quote</div><div class="allok" id="allok">${ic('check')}All photos approved</div>`;
   if(s.key==='trigger')h=head('Operations','Operations triggers the payment','All checks passed. One click hands the payment to Accounts Payable.')+
     `<div class="release"><div class="rbtn" id="rbtn">${ic('send')}<span id="rbtn-t">Release ${usd2.format(J.amount)}</span></div>
      <div class="handoff" id="handoff">Operations<span class="arrow"><i></i></span>Accounts Payable</div></div>`;
@@ -1179,33 +1204,40 @@ function delta(cur,prev,goodUp,mode){
   return `<span class="dl ${cls}">${flat?'±':d>0?'▲':'▼'} ${txt.replace(/^[+−]/,'')}</span>`;
 }
 function kpi(l,v,s,cls){return `<div class="kpi${cls?' '+cls:''}"><span class="lbl">${l}</span><span class="val num">${v}</span><span class="sub">${s}</span></div>`;}
-function biz(wos){const rev=sum(wos,w=>w.billed),cost=sum(wos,w=>w.cost),np=sum(wos,w=>w.pays.length);
-  return {n:wos.length,rev,cost,gp:rev-cost,mg:rev?(rev-cost)/rev:NaN,avg:wos.length?rev/wos.length:NaN,ppj:wos.length?np/wos.length:NaN};}
-function niceStep(max,n){const raw=max/n,p=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/p;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p;}
 function bkLabel(c,i){const b=c.bk[i];return c.size===1?fmtD(b.s):fmtD(b.s);}
 
-/* ══════════════════ BUSINESS ══════════════════ */
-function renderBusiness(){
-  const c=ctx(),B=biz(c.cur),Bp=biz(c.prev),vs=`vs prior ${c.P} d`;
+/* ══════════════════ OVERVIEW ══════════════════ */
+// wait buckets used by the overview split bar and the over-time chart
+const WAITS=[['Within 30 min','k1',h=>h<=.5],['30–60 min','k2',h=>h>.5&&h<=1],['1–2 h','k3',h=>h>1&&h<=2],['Over 2 h','k4',h=>h>2]];
+function waitShares(ctp){const N=Math.max(1,ctp.length);return WAITS.map(([n,k,f])=>({n,k,v:ctp.filter(f).length/N}));}
+function renderOverview(){
+  const c=ctx(),S=payStats(c.pCur),Sp=payStats(c.pPrev),vs=`vs prior ${c.P} d`,mo=30/c.P;
   $('#b-range').textContent=rangeLabel(c)+' · '+filterText();
-  $('#b-headline').innerHTML=B.n?`<em>${fmtK(B.rev)}</em> billed on ${fmtN(B.n)} work orders at a <em>${fmtP(B.mg)}</em> gross margin.`:'No work orders match these filters.';
-  // margin gauge, 0–60% scale with the 25–40% target band
-  const at=v=>Math.min(100,Math.max(0,v/.6*100));
-  $('#b-gauge').innerHTML=`<span class="lbl">Gross margin against the 25–40% target</span>
-    <div class="trk"><span class="band" style="left:${at(.25)}%;width:${at(.40)-at(.25)}%"></span><span class="mk" style="left:${at(B.mg||0)}%" title="${fmtP(B.mg)}"></span></div>
-    <div class="ax">${[0,.1,.2,.25,.3,.4,.5,.6].filter(v=>v!==.2&&v!==.3).map(v=>`<span style="left:${at(v)}%">${Math.round(v*100)}%</span>`).join('')}</div>
-    <span class="note"><b>${fmtP(c.cur.filter(w=>w.margin>=.25&&w.margin<=.40).length/Math.max(1,B.n),0)}</b> of jobs inside the band · <b>${fmtN(c.cur.filter(w=>w.margin<.25).length)}</b> below the floor</span>`;
-  const mo=30/c.P;
-  $('#b-kpis').innerHTML=[
-    kpi('Billed to clients',fmtK(B.rev),`${delta(B.rev,Bp.rev,true)} ${vs}`),
-    kpi('Technician cost',fmtK(B.cost),`${delta(B.cost,Bp.cost,false)} ${fmtP(B.cost/B.rev,0)} of billings`),
-    kpi('Gross profit',fmtK(B.gp),`${delta(B.gp,Bp.gp,true)} ${vs}`,'hero'),
-    kpi('Gross margin',fmtP(B.mg).replace('%','<small>%</small>'),`${delta(B.mg,Bp.mg,true,'pp')} ${vs}`,B.mg<.25?'warn':''),
-    kpi('Work orders',fmtN(B.n),`${delta(B.n,Bp.n,true)} ≈ ${fmtN(B.n*mo)} / month`),
-    kpi('Average job',fmt$(B.avg),`${delta(B.avg,Bp.avg,true)} ${B.ppj.toFixed(2)} payments per job`)
+  $('#b-headline').innerHTML=S.count?`<em>${fmtP(S.in1,0)}</em> of technician payments landed within an hour of sign-off.`:'No payments match these filters.';
+  $('#b-gauge').innerHTML=`<span class="lbl">How long technicians waited</span>
+    <div class="split" aria-hidden="true">${waitShares(S.ctp).map(x=>`<i class="${x.k}" style="flex:${x.v}" title="${x.n}: ${fmtP(x.v)}"></i>`).join('')}</div>
+    <div class="split-key">${waitShares(S.ctp).map(x=>`<span><i class="${x.k}"></i>${x.n} <b>${fmtP(x.v,0)}</b></span>`).join('')}</div>`;
+  const held=c.pCur.filter(p=>p.flagged),heldP=c.pPrev.filter(p=>p.flagged);
+  const fin=S.paid.filter(p=>p.type==='Completion').map(p=>p.ctp),finP=Sp.paid.filter(p=>p.type==='Completion').map(p=>p.ctp);
+  const slowest=S.paid.reduce((a,p)=>!a||p.ctp>a.ctp?p:a,null);
+  $('#p-kpis').innerHTML=[
+    kpi('Median sign-off → paid',hUnit(S.med),`${delta(S.med,Sp.med,false)} half of payments, faster`,'hero'),
+    kpi('90th percentile',hUnit(S.p90),`${delta(S.p90,Sp.p90,false)} 9 in 10 paid within`),
+    kpi('Paid within 1 h',(S.in1*100).toFixed(1)+'<small>%</small>',`${delta(S.in1,Sp.in1,true,'pp')} ${(S.in2*100).toFixed(1)}% within 2 h`),
+    kpi('Final payment',hUnit(median(fin)),`${delta(median(fin),median(finP),false)} median, completion payments`),
+    kpi('Held for review',fmtP(held.length/Math.max(1,c.pCur.length)).replace('%','<small>%</small>'),`${delta(held.length/Math.max(1,c.pCur.length),heldP.length/Math.max(1,c.pPrev.length),false,'pp')} ${fmtH(median(held.map(p=>p.review)))} median review`),
+    kpi('Longest wait',hUnit(slowest?slowest.ctp:NaN),slowest?`${slowest.wo.id} · ${slowest.wo.tech}`:'–',slowest&&slowest.ctp>2?'warn':'')
   ].join('');
-  $('#b-rev-meta').textContent=c.size===1?'Per day':'Per week';
-  revChart($('#c-rev'));
+  $('#b-kpis').innerHTML=[
+    kpi('Paid to technicians',fmtK(S.total),`${delta(S.total,Sp.total,true)} ${vs}`),
+    kpi('Payments released',fmtN(S.count),`${delta(S.count,Sp.count,true)} ≈ ${fmtN(S.count*mo)} / month`),
+    kpi('Technicians paid',fmtN(S.techs),`${delta(S.techs,Sp.techs,true)} ${vs}`),
+    kpi('Average payment',fmt$(S.total/Math.max(1,S.count)),`${fmt$(S.total/Math.max(1,S.techs))} per technician`),
+    kpi('Work orders',fmtN(c.cur.length),`${delta(c.cur.length,c.prev.length,true)} ≈ ${fmtN(c.cur.length*mo)} / month`),
+    kpi('Payments per job',(sum(c.cur,w=>w.pays.length)/Math.max(1,c.cur.length)).toFixed(2),'trip, parts and completion')
+  ].join('');
+  $('#sla-meta').textContent=(c.size===1?'Per day':'Per week')+' · share of payments by wait';
+  slaChart($('#c-sla'));
 
   // cash cycle
   const comp=c.pCur.filter(p=>p.type==='Completion'&&p.ctp!=null).map(p=>p.ctp);
@@ -1224,32 +1256,21 @@ function renderBusiness(){
     <div class="hbars aging">${ag.map(([n,a])=>`<div class="hb wide"><span class="name">${n}</span><span class="t"><div style="width:${a/amax*100}%"></div></span><span class="pct">${fmtK(a)}</span></div>`).join('')}</div>`;
 }
 
-function revChart(el){
-  const c=ctx(),bk=c.bk.map(b=>({rev:0,cost:0}));
-  c.cur.forEach(w=>{const b=bk[c.bi(w.day)];b.rev+=w.billed;b.cost+=w.cost;});
-  bk.forEach(b=>b.mg=b.rev?(b.rev-b.cost)/b.rev:NaN);
-  const W=Math.max(280,el.clientWidth-24),H=340,m={l:52,r:40,t:34,b:26},iw=W-m.l-m.r,topH=176,gap=22,botH=H-m.t-m.b-topH-gap;
-  const ymaxRaw=Math.max(1,...bk.map(b=>b.rev)),st=niceStep(ymaxRaw,4),ymax=Math.ceil(ymaxRaw/st)*st;
-  const bw=iw/bk.length,y=v=>m.t+topH-v/ymax*topH,xc=i=>m.l+bw*(i+.5);
-  let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Billed revenue split into technician cost and gross profit, with gross margin below">`;
-  for(let v=0;v<=ymax+1e-6;v+=st)s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${m.l-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--ink-3)">${fmtAx(v)}</text>`;
-  const barW=Math.max(2,bw*.66);
-  bk.forEach((b,i)=>{const x=xc(i)-barW/2,hc=b.cost/ymax*topH,hg=(b.rev-b.cost)/ymax*topH;
-    s+=`<rect x="${x}" y="${m.t+topH-hc}" width="${barW}" height="${hc}" fill="var(--accent-fill)" opacity=".45"><title>${bkLabel(c,i)}: cost ${fmtK(b.cost)}</title></rect>`;
-    s+=`<rect x="${x}" y="${m.t+topH-hc-hg}" width="${barW}" height="${hg}" rx="1.5" fill="var(--good-fill)"><title>${bkLabel(c,i)}: billed ${fmtK(b.rev)}, gross profit ${fmtK(b.rev-b.cost)}</title></rect>`;});
+// 100% stacked bars: share of each day's (or week's) payments by wait bucket
+function slaChart(el){
+  const c=ctx(),groups=c.bk.map(()=>[]);
+  c.pCur.forEach(p=>{if(p.ctp!=null)groups[c.bi(p.day)].push(p.ctp);});
+  const bk=groups.map(g=>({n:g.length,sh:waitShares(g)}));
+  const W=Math.max(280,el.clientWidth-24),H=290,m={l:40,r:14,t:W<480?50:34,b:26},iw=W-m.l-m.r,ih=H-m.t-m.b;
+  const bw=iw/bk.length,y=v=>m.t+ih-v*ih,xc=i=>m.l+bw*(i+.5),barW=Math.max(2,bw*.7);
+  let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Share of payments paid within 1 hour, 1 to 2 hours, 2 to 4 hours and over 4 hours, over time">`;
+  for(let v=0;v<=1.0001;v+=.25)s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${m.l-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--ink-3)">${Math.round(v*100)}%</text>`;
+  const fills=['var(--good-fill)','var(--accent-fill)','var(--warn-fill)','var(--danger-fill)'];
+  bk.forEach((b,i)=>{if(!b.n)return;let acc=0;
+    b.sh.forEach((x,k)=>{const h=x.v*ih;if(h>0)s+=`<rect x="${xc(i)-barW/2}" y="${y(acc+x.v)}" width="${barW}" height="${h}" fill="${fills[k]}"><title>${bkLabel(c,i)} · ${x.n}: ${fmtP(x.v)} of ${fmtN(b.n)} payments</title></rect>`;acc+=x.v;});});
   // legend
-  s+=`<rect x="${m.l}" y="8" width="10" height="10" rx="2" fill="var(--good-fill)"/><text x="${m.l+15}" y="17" font-size="11.5" fill="var(--ink-2)">Gross profit</text>`;
-  s+=`<rect x="${m.l+102}" y="8" width="10" height="10" rx="2" fill="var(--accent-fill)" opacity=".45"/><text x="${m.l+117}" y="17" font-size="11.5" fill="var(--ink-2)">Technician cost</text>`;
-  // margin panel 15%–50%
-  const b0=m.t+topH+gap,lo=.15,hi=.5,ym=v=>b0+botH-(Math.min(hi,Math.max(lo,v))-lo)/(hi-lo)*botH;
-  s+=`<rect x="${m.l}" y="${ym(.40)}" width="${iw}" height="${ym(.25)-ym(.40)}" fill="var(--good-soft)"/>`;
-  s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${b0+botH}" y2="${b0+botH}" stroke="var(--grid)"/>`;
-  [.25,.40].forEach(v=>s+=`<text x="${W-m.r+6}" y="${ym(v)+4}" font-size="11" fill="var(--good)">${v*100}%</text>`);
-  s+=`<text x="${m.l-6}" y="${b0+botH/2+4}" text-anchor="end" font-size="11" fill="var(--ink-3)">Margin</text>`;
-  const pts=bk.map((b,i)=>isFinite(b.mg)?[xc(i),ym(b.mg)]:null).filter(Boolean);
-  if(pts.length)s+=`<path d="${pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}" fill="none" stroke="var(--ink)" stroke-width="1.75"/>`;
-  bk.forEach((b,i)=>{if(isFinite(b.mg))s+=`<circle cx="${xc(i)}" cy="${ym(b.mg)}" r="${i===bk.length-1?4:2.5}" fill="${b.mg<.25?'var(--warn-fill)':'var(--ink)'}"><title>${bkLabel(c,i)}: ${fmtP(b.mg)}</title></circle>`;});
-  const lb=bk[bk.length-1];if(lb&&isFinite(lb.mg))s+=`<text x="${xc(bk.length-1)-8}" y="${ym(lb.mg)-8}" text-anchor="end" font-size="11.5" font-weight="600" fill="var(--ink)">${fmtP(lb.mg)}</text>`;
+  let lx=m.l,ly=8;WAITS.forEach(([n],k)=>{const w=n.length*6.4+32;if(lx+w>W&&lx>m.l){lx=m.l;ly+=16;}
+    s+=`<rect x="${lx}" y="${ly}" width="10" height="10" rx="2" fill="${fills[k]}"/><text x="${lx+15}" y="${ly+9}" font-size="11.5" fill="var(--ink-2)">${n}</text>`;lx+=w;});
   const every=Math.ceil(bk.length/Math.max(1,Math.floor(iw/58)));
   bk.forEach((b,i)=>{if((bk.length-1-i)%every===0)s+=`<text x="${xc(i)}" y="${H-6}" text-anchor="middle" font-size="11" fill="var(--ink-3)">${bkLabel(c,i)}</text>`;});
   el.innerHTML=s+'</svg>';
@@ -1268,14 +1289,6 @@ function renderPayments(){
   const net30=720,net15=360;
   $('#p-compare').innerHTML=[['Seamless FM',S.med,'ours'],['Net 15 terms',net15,''],['Net 30 terms',net30,'']].map(([n,v,cl])=>`<div class="cmp-row ${cl}"><span>${n}</span><span class="b" style="width:${Math.max(1.2,(v||0)/net30*100)}%"></span><span class="v">${v<48?fmtH(v):Math.round(v/24)+' days'}</span></div>`).join('');
   const mo=30/c.P;
-  $('#p-kpis').innerHTML=[
-    kpi('Median sign-off → paid',hUnit(S.med),`${delta(S.med,Sp.med,false)} half of payments, faster`,'hero'),
-    kpi('90th percentile',hUnit(S.p90),`${delta(S.p90,Sp.p90,false)} 9 in 10 paid within`),
-    kpi('Paid within 1 h',(S.in1*100).toFixed(1)+'<small>%</small>',`${delta(S.in1,Sp.in1,true,'pp')} ${(S.in2*100).toFixed(1)}% within 2 h`),
-    kpi('Paid to technicians',fmtK(S.total),`${delta(S.total,Sp.total,true)} ${vs}`),
-    kpi('Payments released',fmtN(S.count),`${delta(S.count,Sp.count,true)} ≈ ${fmtN(S.count*mo)} / month`),
-    kpi('Technicians paid',fmtN(S.techs),`${fmt$(S.total/Math.max(1,S.techs))} each on average`)
-  ].join('');
 
   // where the time goes
   const auto=S.paid.filter(p=>!p.flagged),rev=S.paid.filter(p=>p.flagged);
@@ -1290,7 +1303,7 @@ function renderPayments(){
       <div class="lane-key">${parts.map(p=>`<span><i class="${p[1]}"></i>${p[0]} <b>${fmtH(p[2])}</b></span>`).join('')}</div></div>`;
   }
   $('#lanes').innerHTML=lane('Auto-verified',auto,false)+lane('Held for human review',rev,true)+
-    `<p style="margin:14px 0 0;font-size:12.5px;color:var(--ink-2);max-width:60ch">Most payments pass every automatic check and go straight to release. The rest get a second look from AP before any money moves. Jobs whose cost puts margin under 25% are held automatically.</p>`;
+    `<p style="margin:14px 0 0;font-size:12.5px;color:var(--ink-2);max-width:60ch">Most payments pass every automatic check and go straight to release. The rest get a second look from AP before any money moves.</p>`;
 
   // review panel
   const flagged=c.pCur.filter(p=>p.flagged),FL=Math.max(1,flagged.length);
@@ -1311,17 +1324,27 @@ function renderPayments(){
 
   // structure: payments per work order and payment types
   const wos=c.cur,NW=Math.max(1,wos.length),cnt=[0,0,0,0];wos.forEach(w=>cnt[w.pays.length]++);
-  const types=PTYPES.map(t=>{const ps=S.paid.filter(p=>p.type===t);return {t,n:ps.length,avg:sum(ps,p=>p.paidAmount)/Math.max(1,ps.length),amt:sum(ps,p=>p.paidAmount),med:median(ps.map(p=>p.ctp))};});
+  const types=PTYPES.map(t=>{const ps=S.paid.filter(p=>p.type===t),ctp=ps.map(p=>p.ctp);return {t,n:ps.length,med:median(ctp),p90:pct(ctp,.9),in1:ctp.filter(x=>x<=1).length/Math.max(1,ctp.length)};});
   const ppj=sum(wos,w=>w.pays.length)/NW;
   $('#structure').innerHTML=`<div class="big3">
       <div><span class="v">${ppj.toFixed(2)}</span><span class="l">payments per work order</span></div>
       <div><span class="v">${fmt$(S.total/Math.max(1,S.count))}</span><span class="l">average payment</span></div>
       <div><span class="v">${fmtN(S.count*mo)}</span><span class="l">payments a month at this pace</span></div></div>
     <p class="sub-h">Work orders by number of payments</p>
-    <div class="hbars">${[1,2,3].map(k=>`<div class="hb"><span class="name">${k} payment${k>1?'s':''}</span><span class="t"><div class="a" style="width:${cnt[k]/NW*100}%"></div></span><span class="pct">${Math.round(cnt[k]/NW*100)}%</span></div>`).join('')}</div>
-    <p class="sub-h">Payment types</p>
-    <div class="tbl-wrap"><table><thead><tr><th style="padding-left:0">Type</th><th class="r">Payments</th><th class="r">Average</th><th class="r">Share of $</th><th class="r">Median to paid</th></tr></thead><tbody>
-    ${types.map(x=>`<tr><td style="padding-left:0">${x.t}</td><td class="r">${fmtN(x.n)}</td><td class="r">${fmt$(x.avg)}</td><td class="r">${fmtP(x.amt/Math.max(1,S.total),0)}</td><td class="r">${fmtH(x.med)}</td></tr>`).join('')}</tbody></table></div>`;
+    <div class="hbars">${[1,2,3].map(k=>`<div class="hb"><span class="name">${k} payment${k>1?'s':''}</span><span class="t"><div class="a" style="width:${cnt[k]/NW*100}%"></div></span><span class="pct">${Math.round(cnt[k]/NW*100)}%</span></div>`).join('')}</div>`;
+  $('#ptypes').innerHTML=`<thead><tr><th>Type</th><th class="r">Payments</th><th class="r">Median</th><th class="r">90th pct</th><th class="r">Within 1 h</th></tr></thead><tbody>`+
+    types.map(x=>`<tr><td>${x.t}</td><td class="r">${fmtN(x.n)}</td><td class="r">${waitCell(x.med)}</td><td class="r">${fmtH(x.p90)}</td><td class="r">${miniBar(x.in1)}</td></tr>`).join('')+'</tbody>';
+
+  // by state
+  const st=[...new Set(S.paid.map(p=>p.wo.state))].map(k=>{const ctp=S.paid.filter(p=>p.wo.state===k).map(p=>p.ctp);
+    return {k,n:ctp.length,m:median(ctp),p90:pct(ctp,.9),in1:ctp.filter(x=>x<=1).length/Math.max(1,ctp.length)};}).sort((a,b)=>b.n-a.n);
+  $('#states').innerHTML=`<thead><tr><th>State</th><th class="r">Payments</th><th class="r">Median</th><th class="r">90th pct</th><th class="r">Within 1 h</th></tr></thead><tbody>`+
+    (st.length?st.map(x=>`<tr><td>${STATES[x.k]} <span class="l2">${REGION_OF[x.k]}</span></td><td class="r">${fmtN(x.n)}</td><td class="r">${waitCell(x.m)}</td><td class="r">${fmtH(x.p90)}</td><td class="r">${miniBar(x.in1)}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">No payments match these filters.</td></tr>')+'</tbody>';
+
+  // slowest payments
+  const slow=[...S.paid].sort((a,b)=>b.ctp-a.ctp).slice(0,12);
+  $('#slow').innerHTML=`<thead><tr><th>Work order</th><th>Technician</th><th>Trade</th><th>Payment</th><th>Signed off</th><th class="r">Waited</th><th>Why</th></tr></thead><tbody>`+
+    (slow.length?slow.map(p=>`<tr><td><b>${p.wo.id}</b></td><td>${p.wo.tech}</td><td>${p.wo.trade}</td><td>${p.type}</td><td>${fmtDT(p.tTrigger)}</td><td class="r">${waitCell(p.ctp)}</td><td>${p.flagged?`<span class="pill w">Held · ${esc(p.reasons.join(', '))}</span>`:'<span class="pill n">Not held</span>'}</td></tr>`).join(''):'<tr><td colspan="7" class="empty">No payments match these filters.</td></tr>')+'</tbody>';
 
   // methods
   const ms=METHODS.map(M=>{const rows=S.paid.filter(p=>p.method===M.name);return {n:M.name,share:rows.length/Math.max(1,S.paid.length),m:median(rows.map(p=>p.ctp))};});
@@ -1334,13 +1357,18 @@ function renderPayments(){
     tr.map(x=>`<tr><td>${x.n}</td><td class="r">${fmtN(x.c)}</td><td class="r">${fmtK(x.s)}</td><td class="r">${fmtH(x.m)}</td><td class="r">${fmtP(x.h)}</td><td class="r">${(x.w*100).toFixed(1)}%<span class="mini"><i style="width:${x.w*100}%"></i></span></td></tr>`).join('')+'</tbody>';
 
   // top technicians
-  const tm=new Map();S.paid.forEach(p=>{let t=tm.get(p.wo.techId);if(!t){t={id:p.wo.techId,name:p.wo.tech,wos:new Set(),paid:0,held:0,n:0,trades:{}};tm.set(p.wo.techId,t);}t.wos.add(p.wo);t.paid+=p.paidAmount;t.n++;if(p.flagged)t.held++;t.trades[p.wo.trade]=(t.trades[p.wo.trade]||0)+1;});
+  const tm=new Map();S.paid.forEach(p=>{let t=tm.get(p.wo.techId);if(!t){t={id:p.wo.techId,name:p.wo.tech,wos:new Set(),paid:0,held:0,ctp:[],trades:{}};tm.set(p.wo.techId,t);}t.wos.add(p.wo);t.paid+=p.paidAmount;t.ctp.push(p.ctp);if(p.flagged)t.held++;t.trades[p.wo.trade]=(t.trades[p.wo.trade]||0)+1;});
+  tm.forEach(t=>{t.med=median(t.ctp);t.max=Math.max(...t.ctp);t.in1=t.ctp.filter(x=>x<=1).length/t.ctp.length;});
+  const techRow=t=>{const tt=Object.entries(t.trades).sort((a,b)=>b[1]-a[1])[0][0];
+    return `<tr><td>${t.name} <span class="l2">#${String(t.id).padStart(4,'0')} · ${tt}</span></td><td class="r">${fmtN(t.wos.size)}</td><td class="r">${fmtN(t.ctp.length)}</td><td class="r">${fmtK(t.paid)}</td><td class="r">${waitCell(t.med)}</td><td class="r">${waitCell(t.max)}</td><td class="r">${miniBar(t.in1)}</td><td class="r">${t.held}</td></tr>`;};
+  const techHead=`<thead><tr><th>Technician</th><th class="r">Jobs</th><th class="r">Payments</th><th class="r">Paid</th><th class="r">Median wait</th><th class="r">Longest</th><th class="r">Within 1 h</th><th class="r">Held</th></tr></thead><tbody>`;
+  const none='<tr><td colspan="8" class="empty">No payments match these filters.</td></tr>';
   const top=[...tm.values()].sort((a,b)=>b.paid-a.paid).slice(0,25);
-  $('#techs').innerHTML=`<thead><tr><th>Technician</th><th class="r">Jobs</th><th class="r">Payments</th><th class="r">Paid</th><th class="r">Job margin</th><th class="r">Held</th></tr></thead><tbody>`+
-    top.map(t=>{const ws=[...t.wos],b=biz(ws),tt=Object.entries(t.trades).sort((a,b)=>b[1]-a[1])[0][0];
-      return `<tr><td>${t.name} <span class="l2">#${String(t.id).padStart(4,'0')} · ${tt}</span></td><td class="r">${fmtN(ws.length)}</td><td class="r">${fmtN(t.n)}</td><td class="r">${fmtK(t.paid)}</td><td class="r">${mgCell(b.mg)}</td><td class="r">${t.held}</td></tr>`;}).join('')+'</tbody>';
+  $('#techs').innerHTML=techHead+(top.length?top.map(techRow).join(''):none)+'</tbody>';
+  const waiting=[...tm.values()].filter(t=>t.ctp.length>=3).sort((a,b)=>b.med-a.med).slice(0,10);
+  $('#techs-slow').innerHTML=techHead+(waiting.length?waiting.map(techRow).join(''):none)+'</tbody>';
 
-  histogram($('#c-hist'),S);trend($('#c-trend'));heat($('#c-heat'),S.paid);
+  histogram($('#c-hist'),S);trend($('#c-trend'));heat($('#c-heat'),S.paid);cdf($('#c-cdf'),S);byHour($('#c-hour'),S.paid);
 }
 
 function histogram(el,S){
@@ -1383,6 +1411,37 @@ function trend(el){
   s+=`<text x="${m.l}" y="14" font-size="11.5" fill="var(--ink-2)">Median ${ch>=0?'down':'up'} <tspan font-weight="700" fill="${ch>=0?'var(--good)':'var(--danger)'}">${Math.abs(Math.round(ch*100))}%</tspan> since ${bkLabel(c,F0.i)}</text>`;
   el.innerHTML=s+'</svg>';
 }
+// cumulative share of payments paid by each wait, 0–2 h
+function cdf(el,S){
+  const W=Math.max(280,el.clientWidth-24),H=230,m={l:40,r:14,t:16,b:28},iw=W-m.l-m.r,ih=H-m.t-m.b,MAXM=120;
+  if(!S.ctp.length){el.innerHTML='<p class="empty">No payments in this period.</p>';return;}
+  const sorted=Float64Array.from(S.ctp.map(h=>h*60)).sort(),N=sorted.length;
+  const at=mn=>{let lo=0,hi=N;while(lo<hi){const k=(lo+hi)>>1;if(sorted[k]<=mn)lo=k+1;else hi=k;}return lo/N;};
+  const x=mn=>m.l+mn/MAXM*iw,y=v=>m.t+ih-v*ih;
+  let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Cumulative share of payments paid by minutes after sign-off">`;
+  for(let v=0;v<=1.0001;v+=.25)s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${m.l-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--ink-3)">${Math.round(v*100)}%</text>`;
+  const pts=[];for(let mn=0;mn<=MAXM;mn+=2)pts.push([x(mn),y(at(mn))]);
+  const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  s+=`<path d="${d} L${x(MAXM)} ${y(0)} L${x(0)} ${y(0)} Z" fill="var(--good-soft)"/><path d="${d}" fill="none" stroke="var(--good-fill)" stroke-width="2.25"/>`;
+  [[15,'15 min'],[30,'30 min'],[60,'1 h']].forEach(([mn,l])=>{const v=at(mn);
+    s+=`<line x1="${x(mn)}" x2="${x(mn)}" y1="${y(v)}" y2="${y(0)}" stroke="var(--ink)" stroke-dasharray="3 3"/><circle cx="${x(mn)}" cy="${y(v)}" r="3.5" fill="var(--ink)"/><text x="${x(mn)+6}" y="${y(v)-7}" font-size="11.5" font-weight="600" fill="var(--ink)">${fmtP(v,0)} by ${l}</text>`;});
+  for(let mn=0;mn<=MAXM;mn+=W<480?60:30)s+=`<text x="${x(mn)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--ink-3)">${mn<60?mn+' min':mn/60+' h'}</text>`;
+  el.innerHTML=s+'</svg>';
+}
+// median wait by the hour of day the payment was triggered (sign-off)
+function byHour(el,paid){
+  const g=Array.from({length:24},()=>[]);
+  paid.forEach(p=>g[Math.min(23,Math.floor(((p.tTrigger%24)+24)%24))].push(p.ctp*60));
+  const md=g.map(a=>median(a));
+  const W=Math.max(280,el.clientWidth-24),H=230,m={l:44,r:10,t:16,b:28},iw=W-m.l-m.r,ih=H-m.t-m.b;
+  const ymax=Math.max(15,Math.ceil(Math.max(...md.filter(isFinite),0)/15)*15),bw=iw/24,y=v=>m.t+ih-v/ymax*ih;
+  let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Median minutes to payment by hour of sign-off">`;
+  for(let v=0;v<=ymax;v+=15)s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${m.l-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--ink-3)">${v} min</text>`;
+  md.forEach((v,h)=>{if(!isFinite(v))return;const bh=ih*v/ymax;
+    s+=`<rect x="${m.l+h*bw+1}" y="${m.t+ih-bh}" width="${Math.max(1,bw-2)}" height="${bh}" rx="1.5" fill="${v<=60?'var(--good-fill)':'var(--warn-fill)'}"><title>Signed off ${clockStr(h)}–${clockStr(h+1)}: median ${fmtH(v/60)} · ${fmtN(g[h].length)} payments</title></rect>`;});
+  [0,6,12,18].forEach(h=>s+=`<text x="${m.l+h*bw}" y="${H-8}" font-size="11" fill="var(--ink-3)">${h===0?'12 AM':h===12?'12 PM':h<12?h+' AM':(h-12)+' PM'}</text>`);
+  el.innerHTML=s+'</svg>';
+}
 function heat(el,paid){
   const g=Array.from({length:7},()=>new Array(24).fill(0));
   paid.forEach(p=>{const d=Math.floor(p.tPaid/24),dow=(dDate(d).getDay()+6)%7,h=Math.floor(p.tPaid-d*24);g[dow][Math.min(23,h)]++;});
@@ -1396,11 +1455,12 @@ function heat(el,paid){
 }
 
 /* ══════════════════ WORK ORDERS LEDGER ══════════════════ */
-const LCHIPS=[['all','All'],['held','Held for review'],['floor','Below 25% margin'],['multi','2+ payments'],['overdue','Client overdue'],['open','Payment in progress']];
+const LCHIPS=[['all','All'],['held','Held for review'],['slow','Waited over 2 h'],['multi','2+ payments'],['overdue','Client overdue'],['open','Payment in progress']];
+function longestWait(w){const c=w.pays.filter(p=>p.ctp!=null).map(p=>p.ctp);return c.length?Math.max(...c):NaN;}
 const L={q:'',chip:'all',show:40,open:null};
 function payStatus(p){if(p.tPaid==null)return ['Stopped','r'];if(p.tPaid>NOW)return ['Releasing','a'];if(p.outcome==='adjusted')return ['Corrected, paid','a'];if(p.flagged)return ['Paid after review','w'];return ['Paid','g'];}
 function chipTest(k,w){
-  if(k==='held')return w.flagged;if(k==='floor')return w.margin<.25;if(k==='multi')return w.pays.length>1;
+  if(k==='held')return w.flagged;if(k==='slow')return longestWait(w)>2;if(k==='multi')return w.pays.length>1;
   if(k==='overdue')return w.collectT>NOW&&w.dueT<NOW;if(k==='open')return w.pays.some(p=>p.tPaid!=null&&p.tPaid>NOW);return true;}
 function invCell(w){
   if(w.invoiceT>NOW)return '<span class="pill n">Invoicing</span>';
@@ -1412,13 +1472,13 @@ function renderLedger(){
   $('#l-chips').innerHTML=LCHIPS.map(([k,n])=>`<button type="button" class="chipf" data-k="${k}" aria-pressed="${L.chip===k}">${n}<b>${fmtN(base.filter(w=>chipTest(k,w)).length)}</b></button>`).join('');
   const rows=base.filter(w=>chipTest(L.chip,w)).sort((a,b)=>b.tClose-a.tClose);
   $('#l-count').textContent=`Showing ${fmtN(Math.min(L.show,rows.length))} of ${fmtN(rows.length)} work orders · ${rangeLabel(c)}`;
-  const head=`<thead><tr><th>Work order</th><th>Closed</th><th>Client · site</th><th>Trade</th><th>Technician</th><th class="r">Billed</th><th class="r">Tech cost</th><th class="r">Margin</th><th>Payments</th><th>Client invoice</th></tr></thead>`;
-  if(!rows.length){$('#ledger').innerHTML=head+'<tbody><tr><td colspan="10" class="empty">No work orders match. Clear the search or pick another filter.</td></tr></tbody>';$('#l-more').innerHTML='';return;}
+  const head=`<thead><tr><th>Work order</th><th>Closed</th><th>Client · site</th><th>Trade</th><th>Technician</th><th class="r">Paid to tech</th><th class="r">Longest wait</th><th>Payments</th><th>Client invoice</th></tr></thead>`;
+  if(!rows.length){$('#ledger').innerHTML=head+'<tbody><tr><td colspan="9" class="empty">No work orders match. Clear the search or pick another filter.</td></tr></tbody>';$('#l-more').innerHTML='';return;}
   $('#ledger').innerHTML=head+'<tbody>'+rows.slice(0,L.show).map(w=>{
     const open=L.open===w.id;
     const dots=w.pays.map(p=>{const[t,cl]=payStatus(p);return `<i class="${cl==='g'?'':cl}" title="${p.type}: ${t}"></i>`;}).join('');
     return `<tr class="row${open?' open':''}" data-id="${w.id}" tabindex="0" aria-expanded="${open}"><td><b><span class="car" aria-hidden="true">›</span> ${w.id}</b></td><td>${fmtDT(w.tClose)}</td><td>${esc(w.client)} <span class="l2">${w.site}</span></td><td>${w.trade}</td><td>${w.tech}</td>
-      <td class="r">${fmt$(w.billed)}</td><td class="r">${fmt$(w.cost)}</td><td class="r">${mgCell(w.margin)}</td><td>${w.pays.length}<span class="pd-dots">${dots}</span></td><td>${invCell(w)}</td></tr>`+(open?detailRow(w):'');
+      <td class="r">${fmt$(w.cost)}</td><td class="r">${waitCell(longestWait(w))}</td><td>${w.pays.length}<span class="pd-dots">${dots}</span></td><td>${invCell(w)}</td></tr>`+(open?detailRow(w):'');
   }).join('')+'</tbody>';
   $('#l-more').innerHTML=rows.length>L.show?`<button type="button" class="btn" id="l-morebtn">Show ${Math.min(40,rows.length-L.show)} more</button>`:'';
 }
@@ -1429,11 +1489,12 @@ function detailRow(w){
       <div>Signed off ${fmtDT(p.tTrigger)}${p.tPaid!=null?` → ${p.tPaid>NOW?'expected':'paid'} ${fmtDT(p.tPaid)} <b>(${fmtH(p.ctp)})</b>`:''} · ${p.method}</div>${rv}</div>`;}).join('');
   const adj=w.quoted-w.cost;
   const inv=w.invoiceT>NOW?'Not invoiced yet':w.collectT<=NOW?`Collected ${fmtD(Math.floor(w.collectT/24))} · ${Math.round((w.collectT-w.invoiceT)/24)} days after invoice`:(w.dueT<NOW?`${Math.round((NOW-w.dueT)/24)} days overdue`:`Due ${fmtD(Math.floor(w.dueT/24))}`);
-  return `<tr class="detail"><td colspan="10"><div class="det">
+  const waits=w.pays.filter(p=>p.ctp!=null).map(p=>p.ctp);
+  return `<tr class="detail"><td colspan="9"><div class="det">
     <div><h4>Payments to ${w.tech}</h4><div class="pays">${pays}</div></div>
-    <div><h4>Job economics</h4><div class="kv"><span>Billed to client</span><b>${usd2.format(w.billed)}</b><span>Technician cost as quoted</span><b>${usd2.format(w.quoted)}</b>
-      ${adj?`<span>Review corrections</span><b>−${usd2.format(adj)}</b>`:''}<span>Technician cost paid</span><b>${usd2.format(w.cost)}</b>
-      <span class="tot">Gross profit</span><b class="tot">${usd2.format(w.gp)}</b><span>Gross margin</span><b>${mgCell(w.margin)}</b></div></div>
+    <div><h4>Payment summary</h4><div class="kv"><span>Quoted to technician</span><b>${usd2.format(w.quoted)}</b>
+      ${adj?`<span>Review corrections</span><b>−${usd2.format(adj)}</b>`:''}<span class="tot">Paid to technician</span><b class="tot">${usd2.format(w.cost)}</b>
+      <span>Fastest payment</span><b>${waits.length?fmtH(Math.min(...waits)):'–'}</b><span>Longest wait</span><b>${waitCell(longestWait(w))}</b></div></div>
     <div><h4>Client invoice</h4><div class="kv"><span>Client</span><b>${esc(w.client)}</b><span>Site</span><b>${w.site} · ${w.city}</b><span>Invoiced</span><b>${w.invoiceT>NOW?'–':fmtD(Math.floor(w.invoiceT/24))}</b>
       <span>Terms</span><b>Net ${w.terms}</b><span>Status</span><b>${inv}</b><span>Cash fronted</span><b>${w.collectT>NOW?usd2.format(w.cost):'Settled'}</b></div></div>
   </div></td></tr>`;
@@ -1453,7 +1514,7 @@ let sub='overview';
 const SUBS=['overview','clients','speed','review','techs','ledger'];
 function renderView(){
   if(view!=='analytics')return;
-  if(sub==='ledger')renderLedger();else{renderBusiness();renderPayments();}
+  if(sub==='ledger')renderLedger();else{renderOverview();renderPayments();}
   const c=ctx();$('#f-note').innerHTML=`<b>${fmtN(c.cur.length)}</b> work orders · <b>${fmtN(c.pCur.length)}</b> payments in view`;}
 function selectSub(k){sub=k;document.querySelectorAll('.subtab').forEach(b=>b.setAttribute('aria-selected',b.dataset.sub===k));SUBS.forEach(x=>$('#sub-'+x).hidden=x!==k);renderView();}
 $('#subtabs').addEventListener('click',e=>{const b=e.target.closest('.subtab');if(b)selectSub(b.dataset.sub);});
@@ -1475,7 +1536,6 @@ function select(which){
 VIEWS.forEach(v=>$('#tab-'+v).addEventListener('click',()=>select(v)));
 document.querySelector('.tabs').addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;const i=VIEWS.indexOf(view),n=VIEWS[(i+(e.key==='ArrowRight'?1:VIEWS.length-1))%VIEWS.length];select(n);$('#tab-'+n).focus();});
 let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(view==='analytics'&&sub!=='ledger')renderView();},120);});
-const h=location.hash.slice(1);if(h==='analytics')select('analytics');else if(SUBS.includes(h)){select('analytics');selectSub(h);}
 
 /* ══════════════════ REAL DATA: ClickUp jobs on the Live page ══════════════════
    /api/live returns today's work orders that reached Done/Incurred. The page reads it
@@ -1598,6 +1658,7 @@ setInterval(()=>{
 },1000);
 renderUnavailable();setSrc();
 if(location.protocol.startsWith('http'))loadReal(false);
+const h=location.hash.slice(1);if(h==='analytics')select('analytics');else if(SUBS.includes(h)){select('analytics');selectSub(h);}
 })();
 </script>
 
