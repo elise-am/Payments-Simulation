@@ -86,6 +86,7 @@ svg.i{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .btn:disabled{opacity:.5;cursor:default}
 .goalbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;margin-bottom:8px}
 .goalbar .gl{font-size:12px;font-weight:600;color:var(--accent);letter-spacing:.02em}
+.goalbar .segs{display:flex;flex-wrap:wrap;gap:8px}
 .kpi .lbl .gx{display:inline-block;margin-left:4px;padding:0 5px;border-radius:3px;background:var(--accent-soft);color:var(--accent);letter-spacing:0}
 .notice{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;padding:8px 12px;border-radius:var(--radius);background:var(--warn-soft);color:var(--warn);font-size:12.5px;font-weight:600}
 .notice div{display:flex;align-items:center;gap:8px}
@@ -534,7 +535,7 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
 
   <!-- ═══════════════ LIVE ═══════════════ -->
   <section id="view-live" role="tabpanel" aria-labelledby="tab-live">
-    <div class="goalbar" id="goalbar" hidden></div>
+    <div class="goalbar" id="goalbar"></div>
     <div class="kpis sm" id="today"></div>
 
     <div class="notice" id="notice" role="status" hidden></div>
@@ -1325,7 +1326,7 @@ async function loadReal(force){
   }catch(e){console.error('Live data:',e);realErr=REAL?'Could not show the ClickUp data':'ClickUp unreachable';}
   realBusy=false;realNextAt=Date.now()+REFRESH_MS;setSrc();if(!REAL)renderUnavailable();
 }
-/* ClickUp shows today's real work orders; Demo plays the simulated story with modeled numbers. */
+/* Real data shows today's ClickUp work orders; Demo plays the simulated story with modeled numbers. */
 function setMode(m){
   MODE=m;try{localStorage.setItem('liveSource',m);}catch{}
   if(m==='real'){if(REAL)renderReal();else renderUnavailable();}
@@ -1334,7 +1335,7 @@ function setMode(m){
     $('#flows-h').innerHTML='<h2>Also on the way</h2><span class="meta">Other payments moving through the same steps</span>';
     $('#wall-h').innerHTML='<h2>Just paid</h2><span class="meta">Newest first</span>';
     $('#wall').innerHTML=simWall;
-    $('#notice').hidden=true;$('#goalbar').hidden=true;
+    $('#notice').hidden=true;renderGoalbar();
     renderFlows(-1);renderToday();parts=[];newJourney();
   }
   setSrc();
@@ -1342,23 +1343,18 @@ function setMode(m){
 function setSrc(){
   const el=$('#src');if(!el)return;
   if(view==='analytics'){el.innerHTML='<span class="sim-chip" title="Modeled data for demonstration">Simulated data</span>';return;}
-  const seg=`<div class="seg" role="group" aria-label="Data source"><button type="button" data-m="real" aria-pressed="${MODE==='real'}">ClickUp</button><button type="button" data-m="demo" aria-pressed="${MODE!=='real'}">Demo</button></div>`;
-  if(MODE!=='real'){el.innerHTML=seg+'<span class="sim-chip" title="Modeled data for demonstration">Simulated data</span>';return;}
+  if(MODE!=='real'){el.innerHTML='<span class="sim-chip" title="Modeled data for demonstration">Simulated data</span>';return;}
   const secs=Math.max(0,Math.ceil((realNextAt-Date.now())/1000));
   const status=realBusy?'Refreshing…':REAL?`Updated ${tzTime(REAL.asOf)} · next in ${secs}s`:(realErr?'':'Connecting to ClickUp…');
-  el.innerHTML=seg+`<span class="upd">${status}${realErr?`${status?' · ':''}<b class="mg lo">${esc(realErr)}</b>`:''}</span>
+  el.innerHTML=`<span class="upd">${status}${realErr?`${status?' · ':''}<b class="mg lo">${esc(realErr)}</b>`:''}</span>
     <button type="button" class="btn" id="refresh"${realBusy?' disabled':''}>Refresh</button>`;
 }
-$('#src').addEventListener('click',e=>{
-  if(e.target.closest('#refresh')){loadReal(true);return;}
-  const b=e.target.closest('[data-m]');if(!b)return;
-  const m=b.dataset.m==='real'?'real':'demo';if(m!==MODE)setMode(m);
-});
+$('#src').addEventListener('click',e=>{if(e.target.closest('#refresh'))loadReal(true);});
 /* Before the first ClickUp answer, or when ClickUp can't be reached and nothing was loaded yet. */
 function renderUnavailable(){
   if(REAL||MODE!=='real')return;
   const loading=!realErr;
-  $('#pause').hidden=true;$('#next').disabled=true;$('#goalbar').hidden=true;$('#notice').hidden=true;
+  $('#pause').hidden=true;$('#next').disabled=true;renderGoalbar();$('#notice').hidden=true;
   $('#today').innerHTML=['Work orders completed','Jobs with technician paid','Payments released','Average technician cost']
     .map(l=>`<div class="kpi"><span class="lbl">${l}</span><span class="val num">–</span><span class="sub"></span></div>`).join('');
   $('#wo-title').textContent=loading?'Loading today’s work orders…':'Couldn’t load today’s work orders';
@@ -1374,12 +1370,16 @@ function renderUnavailable(){
    (pace of 4,000 work orders a month). Cards are labeled as the goal; Today shows the real numbers. */
 const GOAL_X=5;
 let goalOn=true;try{goalOn=localStorage.getItem('goalView')!=='actual';}catch{}
+/* The row above the cards: Real data / Demo, plus Today / Goal when showing real data. */
 function renderGoalbar(){
-  const g=$('#goalbar');g.hidden=MODE!=='real';if(g.hidden)return;
-  g.innerHTML=`<span class="gl">${goalOn?'Daily goal':'Today so far, from ClickUp'}</span>
-    <div class="seg" role="group" aria-label="Numbers"><button type="button" data-g="actual" aria-pressed="${!goalOn}">Today</button><button type="button" data-g="goal" aria-pressed="${goalOn}">Goal</button></div>`;
+  const real=MODE==='real',goal=real&&REAL;
+  $('#goalbar').innerHTML=`<span class="gl">${!real?'Demo · simulated data':goal?(goalOn?'Daily goal':'Today so far, from ClickUp'):'Real data from ClickUp'}</span>
+    <div class="segs"><div class="seg" role="group" aria-label="Data"><button type="button" data-m="real" aria-pressed="${real}">Real data</button><button type="button" data-m="demo" aria-pressed="${!real}">Demo</button></div>${goal?`
+    <div class="seg" role="group" aria-label="Numbers"><button type="button" data-g="actual" aria-pressed="${!goalOn}">Today</button><button type="button" data-g="goal" aria-pressed="${goalOn}">Goal</button></div>`:''}</div>`;
 }
-$('#goalbar').addEventListener('click',e=>{const b=e.target.closest('[data-g]');if(!b)return;goalOn=b.dataset.g==='goal';try{localStorage.setItem('goalView',goalOn?'goal':'actual');}catch{}renderReal();});
+$('#goalbar').addEventListener('click',e=>{
+  const m=e.target.closest('[data-m]');if(m){const v=m.dataset.m==='real'?'real':'demo';if(v!==MODE)setMode(v);return;}
+  const b=e.target.closest('[data-g]');if(!b)return;goalOn=b.dataset.g==='goal';try{localStorage.setItem('goalView',goalOn?'goal':'actual');}catch{}renderReal();});
 function realKpis(jobs){
   const x=goalOn?GOAL_X:1,withCost=jobs.filter(j=>j.cost!=null),cost=sum(withCost,j=>j.cost);
   return [[goalOn?'Work orders per day':'Work orders completed',fmtN(jobs.length*x),goalOn?'Target for a full day':''],
