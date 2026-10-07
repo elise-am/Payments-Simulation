@@ -394,6 +394,7 @@ footer{margin-top:22px;font-size:12px;color:var(--ink-3)}
 .datebox .dt{display:flex;flex-direction:column;gap:1px;min-width:0}
 .datebox .dt b{font-size:13.5px;font-weight:700}
 .datebox .dt span{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:6px}
+.kpis.sm{grid-template-columns:repeat(4,minmax(0,1fr))}
 .kpis.sm .val{font-size:28px}
 .kpi .val.bump{animation:bump .9s ease-out}
 @keyframes bump{from{color:var(--good)}to{color:inherit}}
@@ -912,6 +913,7 @@ function newJourney(){
     signer:SIGNERS[jCount%SIGNERS.length],ops:OPS[jCount%OPS.length],ap:APS[jCount%APS.length],
     start:nowHours(),ref:'PAY-'+(180700+jCount*13)};
   jCount++;elapsed=0;cur=-1;fired=new Set();finished=false;holdLeft=0;
+  if(jCount>1)jobClosed();
 
   $('#wo-title').textContent=job.title;
   $('#wo-meta').innerHTML=`<b>${J.wo}</b> · ${job.trade} · ${esc(client.name)} ${J.site}, ${J.city} · Technician <b>${tech}</b>`;
@@ -1079,7 +1081,7 @@ function finish(){
   $('#timer-v').innerHTML=hm(J.cum[7]);
   $('#timer-s').textContent=clockStr(J.start)+' → '+clockStr(J.start+J.cum[7]/60);
   addPaid({name:J.tech,trade:J.job.trade,amt:J.amount,type:'Completion'},true);
-  recordToday({type:'Completion',amt:J.amount,billed:J.billed,cost:J.cost});
+  recordToday({type:'Completion'});
 }
 
 /* today so far: seeded from the average recent weekday, scaled to the time of day */
@@ -1088,22 +1090,23 @@ const TODAY=(function(){
   const days=new Set(recent.map(w=>w.day)).size||1,frac=dayFrac();
   const wos=recent.length/days*frac,billed=sum(recent,w=>w.billed)/days*frac,cost=sum(recent,w=>w.cost)/days*frac;
   const rp=DATA.pays.filter(p=>p.day>=NDAY-28&&p.tPaid!=null&&dDate(p.day).getDay()%6!==0);
-  return {wos:Math.round(wos),pays:Math.round(rp.length/days*frac),paid:sum(rp,p=>p.paidAmount)/days*frac,billed,cost,review:9};
+  const W=Math.round(wos);return {wos:W,jobsPaid:Math.max(0,W-6),pays:Math.round(rp.length/days*frac),review:9};
 })();
 function renderToday(bump){
-  const t=TODAY,mg=(t.billed-t.cost)/t.billed;
-  const k=[['Work orders closed',fmtN(t.wos),'≈ '+fmtN(t.wos/Math.max(.05,dayFrac()))+' by end of day'],
-    ['Payments released',fmtN(t.pays),(t.pays/Math.max(1,t.wos)).toFixed(1)+' per work order closed'],
-    ['Paid to technicians',fmtK(t.paid),'All by instant transfer'],
-    ['Billed to clients',fmtK(t.billed),'Invoices go out within 2 days'],
-    ['Gross margin',fmtP(mg),'Target 25–40%'],
-    ['In review now',String(t.review),'Held before release']];
-  $('#today').innerHTML=k.map(([l,v,s],n)=>`<div class="kpi${n===4?' hero':''}"><span class="lbl">${l}</span><span class="val num${bump&&bump.includes(n)?' bump':''}">${v}</span><span class="sub">${s}</span></div>`).join('');
+  const t=TODAY,share=t.jobsPaid/Math.max(1,t.wos);
+  const k=[['Work orders closed',fmtN(t.wos),'≈ '+fmtN(t.wos/Math.max(.05,dayFrac()))+' by end of day',''],
+    ['Jobs with technician paid',(share*100).toFixed(1)+'<small>%</small>',`${fmtN(t.jobsPaid)} of ${fmtN(t.wos)} jobs closed today`,'hero'],
+    ['Payments released',fmtN(t.pays),(t.pays/Math.max(1,t.wos)).toFixed(1)+' per work order closed',''],
+    ['In review now',String(t.review),'Held before release','']];
+  $('#today').innerHTML=k.map(([l,v,s,c],n)=>`<div class="kpi ${c}"><span class="lbl">${l}</span><span class="val num${bump&&bump.includes(n)?' bump':''}">${v}</span><span class="sub">${s}</span></div>`).join('');
 }
+/* a job closed on site: counts toward "closed", not yet toward "technician paid" */
+function jobClosed(){TODAY.wos++;renderToday([0,1]);}
+/* a payment landed; a completion payment means that job's technician is fully paid */
 function recordToday(p){
-  TODAY.pays++;TODAY.paid+=p.amt;const b=[1,2];
-  if(p.type==='Completion'){TODAY.wos++;TODAY.billed+=p.billed;TODAY.cost+=p.cost;b.push(0,3,4);}
-  if(Math.random()<.3){TODAY.review=Math.max(4,Math.min(16,TODAY.review+(Math.random()<.5?-1:1)));b.push(5);}
+  TODAY.pays++;const b=[2];
+  if(p.type==='Completion'){TODAY.jobsPaid=Math.min(TODAY.wos,TODAY.jobsPaid+1);b.push(1);}
+  if(Math.random()<.3){TODAY.review=Math.max(4,Math.min(16,TODAY.review+(Math.random()<.5?-1:1)));b.push(3);}
   renderToday(b);
 }
 /* today's date in the header, with a clock that ticks each minute */
@@ -1142,7 +1145,7 @@ function tickFlows(dt){
   flowAcc+=dt;if(flowAcc<1400)return;flowAcc=0;
   const n=Math.floor(FR()*flows.length),f=flows[n];
   f.step++;
-  if(f.step>=8){f.step=7;addPaid(f,true);recordToday(f);flows[n]=newFlow(0,1);}
+  if(f.step>=8){f.step=7;addPaid(f,true);recordToday(f);flows[n]=newFlow(0,1);if(flows[n].type==='Completion')jobClosed();}
   renderFlows(n);
 }
 
