@@ -288,6 +288,7 @@ svg.i{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .kpi.hero .val{color:var(--good)}
 .grid2{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px;margin-bottom:16px}
 .grid2.even{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+#view-analytics>.panel,#hist-demo>.panel{margin-bottom:16px}
 .chart{padding:10px 12px 8px}
 .chart svg{display:block;width:100%}
 .chart text{font-family:var(--font-body)}
@@ -493,9 +494,9 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
 /* analytics: today's real pay speed */
 body[data-view="analytics"] .bar>.src{display:none}
 .pipe{list-style:none;margin:0 0 16px;padding:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(130px,.75fr) minmax(0,1fr) minmax(130px,.75fr) minmax(0,1fr)}
-.pstep{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
-.pstep .top{display:flex;align-items:center;gap:10px}
-.pstep .top div{display:flex;flex-direction:column;min-width:0}
+.pstep{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;min-width:0}
+.pstep .top{display:flex;flex-direction:column;align-items:center;gap:8px}
+.pstep .top div{display:flex;flex-direction:column;align-items:center;min-width:0}
 .pstep .ico{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent)}
 .pstep .ico svg.i{width:17px;height:17px}
 .pstep.done .ico{background:var(--good-soft);color:var(--good)}
