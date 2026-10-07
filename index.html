@@ -387,9 +387,13 @@ footer{margin-top:22px;font-size:12px;color:var(--ink-3)}
 .kpi .sub .dl{margin-right:4px}
 .kpi.warn .val{color:var(--warn)}
 
-.today-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin-bottom:8px}
-.today-h b{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);font-weight:700}
-.today-h span{font-size:12px;color:var(--ink-3)}
+.datebox{display:flex;align-items:center;gap:10px}
+.cal{display:flex;flex-direction:column;width:44px;border:1px solid var(--border-strong);border-radius:var(--radius);overflow:hidden;background:var(--surface);text-align:center}
+.cal .mo{background:var(--accent-fill);color:var(--on-accent);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;line-height:16px}
+.cal .dy{font-family:var(--font-num);font-weight:700;font-size:22px;line-height:26px;font-variant-numeric:tabular-nums}
+.datebox .dt{display:flex;flex-direction:column;gap:1px;min-width:0}
+.datebox .dt b{font-size:13.5px;font-weight:700}
+.datebox .dt span{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:6px}
 .kpis.sm .val{font-size:28px}
 .kpi .val.bump{animation:bump .9s ease-out}
 @keyframes bump{from{color:var(--good)}to{color:inherit}}
@@ -505,6 +509,10 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
       <button class="tab" role="tab" id="tab-analytics" aria-selected="false" aria-controls="view-analytics">Analytics</button>
     </div>
     <span class="spacer"></span>
+    <div class="datebox" id="datebox" aria-live="off">
+      <div class="cal" aria-hidden="true"><span class="mo" id="d-mo"></span><span class="dy num" id="d-dy"></span></div>
+      <div class="dt"><b id="d-full"></b><span><span class="live-dot" aria-hidden="true"></span><span id="d-clk"></span></span></div>
+    </div>
     <span class="sim-chip" title="Modeled data for demonstration">Simulated data</span>
   </header>
 
@@ -525,7 +533,6 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
 
   <!-- ═══════════════ LIVE ═══════════════ -->
   <section id="view-live" role="tabpanel" aria-labelledby="tab-live">
-    <div class="today-h"><b>Today so far</b><span id="today-date"></span></div>
     <div class="kpis sm" id="today"></div>
 
     <div class="story" id="story">
@@ -771,6 +778,8 @@ const FIRST=['Marcus','Andre','Jose','Tyler','Dwayne','Carlos','Kevin','Luis','B
 const LASTI='ABCDEFGHJKLMNPRSTVW';
 const NTECH=900;
 function techName(id){return FIRST[id%FIRST.length]+' '+LASTI[(id*7+3)%LASTI.length]+'.';}
+function nowHours(){const d=new Date();return d.getHours()+d.getMinutes()/60;}
+function dayFrac(){let a=0,t=0;for(let h=0;h<24;h+=.25){const w=shape(h);t+=w;if(h<nowHours())a+=w;}return Math.max(.02,a/t);}
 function shape(h){if(h<6||h>=22)return .2;if(h<8)return .6;if(h<18)return 1;return .5;}
 
 /* 180 days of history ending Oct 6, 2026 (day 179). Time is in hours from day 0. */
@@ -901,7 +910,7 @@ function newJourney(){
   J={job,tech,first,hiccup,client,billed,cost,margin:(billed-cost)/billed,types,earlier,amount,cum,durs,starts,total:starts[7]+durs[7],
     wo:'WO-'+(65213+jCount*37),site:client.pre+(1142+jCount*311)%3000,city:CITIES[(jCount*5)%CITIES.length][0],
     signer:SIGNERS[jCount%SIGNERS.length],ops:OPS[jCount%OPS.length],ap:APS[jCount%APS.length],
-    start:13+(jCount%5)*.6+R()*.4,ref:'PAY-'+(180700+jCount*13)};
+    start:nowHours(),ref:'PAY-'+(180700+jCount*13)};
   jCount++;elapsed=0;cur=-1;fired=new Set();finished=false;holdLeft=0;
 
   $('#wo-title').textContent=job.title;
@@ -1076,14 +1085,14 @@ function finish(){
 /* today so far: seeded from the average recent weekday, scaled to the time of day */
 const TODAY=(function(){
   const recent=DATA.wos.filter(w=>w.day>=NDAY-28&&dDate(w.day).getDay()%6!==0);
-  const days=new Set(recent.map(w=>w.day)).size||1,frac=.53;
+  const days=new Set(recent.map(w=>w.day)).size||1,frac=dayFrac();
   const wos=recent.length/days*frac,billed=sum(recent,w=>w.billed)/days*frac,cost=sum(recent,w=>w.cost)/days*frac;
   const rp=DATA.pays.filter(p=>p.day>=NDAY-28&&p.tPaid!=null&&dDate(p.day).getDay()%6!==0);
   return {wos:Math.round(wos),pays:Math.round(rp.length/days*frac),paid:sum(rp,p=>p.paidAmount)/days*frac,billed,cost,review:9};
 })();
 function renderToday(bump){
   const t=TODAY,mg=(t.billed-t.cost)/t.billed;
-  const k=[['Work orders closed',fmtN(t.wos),'≈ '+fmtN(t.wos/.53)+' by end of day'],
+  const k=[['Work orders closed',fmtN(t.wos),'≈ '+fmtN(t.wos/Math.max(.05,dayFrac()))+' by end of day'],
     ['Payments released',fmtN(t.pays),(t.pays/Math.max(1,t.wos)).toFixed(1)+' per work order closed'],
     ['Paid to technicians',fmtK(t.paid),'All by instant transfer'],
     ['Billed to clients',fmtK(t.billed),'Invoices go out within 2 days'],
@@ -1097,7 +1106,13 @@ function recordToday(p){
   if(Math.random()<.3){TODAY.review=Math.max(4,Math.min(16,TODAY.review+(Math.random()<.5?-1:1)));b.push(5);}
   renderToday(b);
 }
-$('#today-date').textContent='Wednesday, Oct 7 · updates as payments land';
+/* today's date in the header, with a clock that ticks each minute */
+function tickDate(){const d=new Date();
+  $('#d-mo').textContent=d.toLocaleDateString('en-US',{month:'short'});
+  $('#d-dy').textContent=d.getDate();
+  $('#d-full').textContent=d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  $('#d-clk').textContent=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})+' local time';}
+tickDate();setInterval(tickDate,15000);
 
 /* ambient: other payments moving through the same eight steps */
 const FR=mulberry32(5150);let flows=[],woSeq=65400;
