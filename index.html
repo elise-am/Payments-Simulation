@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="Simulated Seamless FM dashboard: live payout journey, business margins, payment speed and work-order ledger.">
-<title>Seamless Payouts &amp; Margins</title>
+<title>Seamless Technician Payouts</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700;800&display=swap">
 <style>
@@ -60,6 +60,13 @@ html,body{margin:0}
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 img{max-width:100%}
 [hidden]{display:none!important}
+.subtabs{display:flex;gap:4px;overflow-x:auto;margin-bottom:16px;border-bottom:1px solid var(--border);scrollbar-width:thin}
+.subtab{appearance:none;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--ink-2);font:600 13.5px var(--font-body);padding:9px 12px 10px;margin-bottom:-1px;cursor:pointer;white-space:nowrap}
+.subtab:hover{color:var(--ink)}
+.subtab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent-fill)}
+.subtab:focus-visible{outline:2px solid var(--accent-fill);outline-offset:-2px}
+.sub>.sub-h{margin-top:4px}
+.sub>.panel{margin-bottom:16px}
 body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.45}
 .wrap{max-width:1320px;margin:0 auto;padding-inline:20px;padding-block:0 28px}
 .num{font-family:var(--font-num);font-variant-numeric:tabular-nums}
@@ -491,13 +498,11 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
   <header class="bar">
     <div class="brand">
       <span class="eyebrow">Seamless FM</span>
-      <h1>Payouts &amp; Margins</h1>
+      <h1>Technician Payouts</h1>
     </div>
     <div class="tabs" role="tablist" aria-label="View">
       <button class="tab" role="tab" id="tab-live" aria-selected="true" aria-controls="view-live"><span class="live-dot" aria-hidden="true"></span>Live</button>
-      <button class="tab" role="tab" id="tab-business" aria-selected="false" aria-controls="view-business">Business</button>
-      <button class="tab" role="tab" id="tab-payments" aria-selected="false" aria-controls="view-payments">Payments</button>
-      <button class="tab" role="tab" id="tab-ledger" aria-selected="false" aria-controls="view-ledger">Work orders</button>
+      <button class="tab" role="tab" id="tab-analytics" aria-selected="false" aria-controls="view-analytics">Analytics</button>
     </div>
     <span class="spacer"></span>
     <span class="sim-chip" title="Modeled data for demonstration">Simulated data</span>
@@ -572,113 +577,144 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
     </div>
   </section>
 
-  <!-- ═══════════════ BUSINESS ═══════════════ -->
-  <section id="view-business" role="tabpanel" aria-labelledby="tab-business" hidden>
-    <div class="a-head">
-      <div>
-        <div class="range" id="b-range"></div>
-        <p class="headline" id="b-headline"></p>
+  <!-- ═══════════════ ANALYTICS (one page, sub-tabs) ═══════════════ -->
+  <section id="view-analytics" role="tabpanel" aria-labelledby="tab-analytics" hidden>
+    <nav class="subtabs" id="subtabs" role="tablist" aria-label="Analytics sections">
+      <button class="subtab" role="tab" data-sub="overview" aria-selected="true">Overview</button>
+      <button class="subtab" role="tab" data-sub="profit" aria-selected="false">Profitability</button>
+      <button class="subtab" role="tab" data-sub="clients" aria-selected="false">Clients &amp; cash</button>
+      <button class="subtab" role="tab" data-sub="speed" aria-selected="false">Payment speed</button>
+      <button class="subtab" role="tab" data-sub="review" aria-selected="false">Review</button>
+      <button class="subtab" role="tab" data-sub="techs" aria-selected="false">Technicians</button>
+      <button class="subtab" role="tab" data-sub="ledger" aria-selected="false">Work orders</button>
+    </nav>
+
+    <!-- Overview -->
+    <div class="sub" id="sub-overview" role="tabpanel">
+      <div class="a-head">
+        <div>
+          <div class="range" id="b-range"></div>
+          <p class="headline" id="b-headline"></p>
+        </div>
+        <div class="gauge" id="b-gauge"></div>
       </div>
-      <div class="gauge" id="b-gauge"></div>
-    </div>
-    <div class="kpis" id="b-kpis"></div>
-    <div class="grid2">
+      <p class="sub-h">Business</p>
+      <div class="kpis" id="b-kpis"></div>
+      <p class="sub-h">Technician payments</p>
+      <div class="kpis" id="p-kpis"></div>
       <div class="panel">
         <div class="panel-h"><h2>Billed, cost and margin</h2><span class="meta" id="b-rev-meta"></span></div>
         <div class="chart" id="c-rev"></div>
       </div>
-      <div class="panel">
-        <div class="panel-h"><h2>Margin on every job</h2><span class="meta">Share of work orders by gross margin</span></div>
-        <div class="chart" id="c-mhist"></div>
-      </div>
     </div>
-    <div class="grid2 even">
-      <div class="panel">
-        <div class="panel-h"><h2>By trade</h2><span class="meta">Work orders closed in the period</span></div>
-        <div class="tbl-wrap"><table id="b-trades"></table></div>
-        <div class="panel-h" style="border-top:1px solid var(--border)"><h2>By region</h2><span class="meta">Same period</span></div>
-        <div class="tbl-wrap"><table id="b-regions"></table></div>
-      </div>
-      <div class="panel">
-        <div class="panel-h"><h2>By client</h2><span class="meta">Revenue, margin and how fast they pay</span></div>
-        <div class="tbl-wrap"><table id="b-clients"></table></div>
-      </div>
-    </div>
-    <div class="grid2 even">
-      <div class="panel">
-        <div class="panel-h"><h2>Cash cycle</h2><span class="meta">Technicians paid now, clients pay later</span></div>
-        <div class="pd" id="b-cash"></div>
-      </div>
-      <div class="panel">
-        <div class="panel-h"><h2>Lowest-margin jobs</h2><span class="meta">Below the 25% floor, worst first</span></div>
-        <div class="tbl-wrap"><table id="b-watch"></table></div>
-      </div>
-    </div>
-  </section>
 
-  <!-- ═══════════════ PAYMENTS ═══════════════ -->
-  <section id="view-payments" role="tabpanel" aria-labelledby="tab-payments" hidden>
-    <div class="a-head">
-      <div>
-        <div class="range" id="p-range"></div>
-        <p class="headline" id="p-headline"></p>
+    <!-- Profitability -->
+    <div class="sub" id="sub-profit" role="tabpanel" hidden>
+      <div class="grid2">
+        <div class="panel">
+          <div class="panel-h"><h2>Margin on every job</h2><span class="meta">Share of work orders by gross margin</span></div>
+          <div class="chart" id="c-mhist"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><h2>By region</h2><span class="meta">Work orders closed in the period</span></div>
+          <div class="tbl-wrap"><table id="b-regions"></table></div>
+        </div>
       </div>
-      <div class="compare" id="p-compare"></div>
-    </div>
-    <div class="kpis" id="p-kpis"></div>
-    <div class="grid2">
-      <div class="panel">
-        <div class="panel-h"><h2>How long technicians wait</h2><span class="meta">Minutes from sign-off to technician paid</span></div>
-        <div class="chart" id="c-hist"></div>
-      </div>
-      <div class="panel">
-        <div class="panel-h"><h2>Where the time goes</h2><span class="meta">Median time per step</span></div>
-        <div class="pd" id="lanes"></div>
-      </div>
-    </div>
-    <div class="grid2 even">
-      <div class="panel">
-        <div class="panel-h"><h2>Speed over time</h2><span class="meta" id="trend-meta"></span></div>
-        <div class="chart" id="c-trend"></div>
-      </div>
-      <div class="panel">
-        <div class="panel-h"><h2>Human review</h2><span class="meta">Payments held before release</span></div>
-        <div class="pd" id="review"></div>
+      <div class="grid2 even">
+        <div class="panel">
+          <div class="panel-h"><h2>By trade</h2><span class="meta">Work orders closed in the period</span></div>
+          <div class="tbl-wrap"><table id="b-trades"></table></div>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><h2>Lowest-margin jobs</h2><span class="meta">Below the 25% floor, worst first</span></div>
+          <div class="tbl-wrap"><table id="b-watch"></table></div>
+        </div>
       </div>
     </div>
-    <div class="grid2 even">
+
+    <!-- Clients & cash -->
+    <div class="sub" id="sub-clients" role="tabpanel" hidden>
+      <div class="grid2">
+        <div class="panel">
+          <div class="panel-h"><h2>By client</h2><span class="meta">Revenue, margin and how fast they pay</span></div>
+          <div class="tbl-wrap"><table id="b-clients"></table></div>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><h2>Cash cycle</h2><span class="meta">Technicians paid now, clients pay later</span></div>
+          <div class="pd" id="b-cash"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payment speed -->
+    <div class="sub" id="sub-speed" role="tabpanel" hidden>
+      <div class="a-head">
+        <div>
+          <div class="range" id="p-range"></div>
+          <p class="headline" id="p-headline"></p>
+        </div>
+        <div class="compare" id="p-compare"></div>
+      </div>
+      <div class="grid2">
+        <div class="panel">
+          <div class="panel-h"><h2>How long technicians wait</h2><span class="meta">Minutes from sign-off to technician paid</span></div>
+          <div class="chart" id="c-hist"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><h2>Where the time goes</h2><span class="meta">Median time per step</span></div>
+          <div class="pd" id="lanes"></div>
+        </div>
+      </div>
+      <div class="grid2 even">
+        <div class="panel">
+          <div class="panel-h"><h2>Speed over time</h2><span class="meta" id="trend-meta"></span></div>
+          <div class="chart" id="c-trend"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><h2>When and how payments go out</h2><span class="meta">Payments released by weekday and hour</span></div>
+          <div class="chart" id="c-heat"></div>
+          <div class="pd" id="methods" style="padding-top:4px"></div>
+        </div>
+      </div>
       <div class="panel">
         <div class="panel-h"><h2>Payments per work order</h2><span class="meta">Trip, parts and completion payments</span></div>
         <div class="pd" id="structure"></div>
       </div>
-      <div class="panel">
-        <div class="panel-h"><h2>When and how payments go out</h2><span class="meta">Payments released by weekday and hour</span></div>
-        <div class="chart" id="c-heat"></div>
-        <div class="pd" id="methods" style="padding-top:4px"></div>
+    </div>
+
+    <!-- Review -->
+    <div class="sub" id="sub-review" role="tabpanel" hidden>
+      <div class="grid2 even">
+        <div class="panel">
+          <div class="panel-h"><h2>Human review</h2><span class="meta">Payments held before release</span></div>
+          <div class="pd" id="review"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><h2>By trade</h2><span class="meta">Payments released, held and paid within the hour</span></div>
+          <div class="tbl-wrap"><table id="trades"></table></div>
+        </div>
       </div>
     </div>
-    <div class="grid2 even">
-      <div class="panel">
-        <div class="panel-h"><h2>By trade</h2><span class="meta">Payments released</span></div>
-        <div class="tbl-wrap"><table id="trades"></table></div>
-      </div>
+
+    <!-- Technicians -->
+    <div class="sub" id="sub-techs" role="tabpanel" hidden>
       <div class="panel">
         <div class="panel-h"><h2>Top technicians</h2><span class="meta">By amount paid in the period</span></div>
         <div class="tbl-wrap"><table id="techs"></table></div>
       </div>
     </div>
-  </section>
 
-  <!-- ═══════════════ WORK ORDERS ═══════════════ -->
-  <section id="view-ledger" role="tabpanel" aria-labelledby="tab-ledger" hidden>
-    <div class="panel">
-      <div class="l-bar">
-        <input type="search" class="srch" id="l-q" placeholder="Search work order, technician, client or site" aria-label="Search work orders">
-        <div class="chipsf" id="l-chips" role="group" aria-label="Show"></div>
-        <span class="l-count" id="l-count"></span>
+    <!-- Work orders -->
+    <div class="sub" id="sub-ledger" role="tabpanel" hidden>
+      <div class="panel">
+        <div class="l-bar">
+          <input type="search" class="srch" id="l-q" placeholder="Search work order, technician, client or site" aria-label="Search work orders">
+          <div class="chipsf" id="l-chips" role="group" aria-label="Show"></div>
+          <span class="l-count" id="l-count"></span>
+        </div>
+        <div class="tbl-wrap"><table id="ledger"></table></div>
+        <div class="more" id="l-more"></div>
       </div>
-      <div class="tbl-wrap"><table id="ledger"></table></div>
-      <div class="more" id="l-more"></div>
     </div>
   </section>
 
@@ -1348,7 +1384,7 @@ function renderPayments(){
 
   // top technicians
   const tm=new Map();S.paid.forEach(p=>{let t=tm.get(p.wo.techId);if(!t){t={id:p.wo.techId,name:p.wo.tech,wos:new Set(),paid:0,held:0,n:0,trades:{}};tm.set(p.wo.techId,t);}t.wos.add(p.wo);t.paid+=p.paidAmount;t.n++;if(p.flagged)t.held++;t.trades[p.wo.trade]=(t.trades[p.wo.trade]||0)+1;});
-  const top=[...tm.values()].sort((a,b)=>b.paid-a.paid).slice(0,10);
+  const top=[...tm.values()].sort((a,b)=>b.paid-a.paid).slice(0,25);
   $('#techs').innerHTML=`<thead><tr><th>Technician</th><th class="r">Jobs</th><th class="r">Payments</th><th class="r">Paid</th><th class="r">Job margin</th><th class="r">Held</th></tr></thead><tbody>`+
     top.map(t=>{const ws=[...t.wos],b=biz(ws),tt=Object.entries(t.trades).sort((a,b)=>b[1]-a[1])[0][0];
       return `<tr><td>${t.name} <span class="l2">#${String(t.id).padStart(4,'0')} · ${tt}</span></td><td class="r">${fmtN(ws.length)}</td><td class="r">${fmtN(t.n)}</td><td class="r">${fmtK(t.paid)}</td><td class="r">${mgCell(b.mg)}</td><td class="r">${t.held}</td></tr>`;}).join('')+'</tbody>';
@@ -1459,15 +1495,22 @@ $('#l-more').addEventListener('click',e=>{if(e.target.id==='l-morebtn'){L.show+=
 
 /* ── filters + tabs ── */
 let view='live';
-function renderView(){if(view==='business')renderBusiness();if(view==='payments')renderPayments();if(view==='ledger')renderLedger();
-  if(view!=='live'){const c=ctx();$('#f-note').innerHTML=`<b>${fmtN(c.cur.length)}</b> work orders · <b>${fmtN(c.pCur.length)}</b> payments in view`;}}
+let sub='overview';
+const SUBS=['overview','profit','clients','speed','review','techs','ledger'];
+function renderView(){
+  if(view!=='analytics')return;
+  if(sub==='ledger')renderLedger();else{renderBusiness();renderPayments();}
+  const c=ctx();$('#f-note').innerHTML=`<b>${fmtN(c.cur.length)}</b> work orders · <b>${fmtN(c.pCur.length)}</b> payments in view`;}
+function selectSub(k){sub=k;document.querySelectorAll('.subtab').forEach(b=>b.setAttribute('aria-selected',b.dataset.sub===k));SUBS.forEach(x=>$('#sub-'+x).hidden=x!==k);renderView();}
+$('#subtabs').addEventListener('click',e=>{const b=e.target.closest('.subtab');if(b)selectSub(b.dataset.sub);});
+$('#subtabs').addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;const i=SUBS.indexOf(sub),n=SUBS[(i+(e.key==='ArrowRight'?1:SUBS.length-1))%SUBS.length];selectSub(n);document.querySelector(`.subtab[data-sub="${n}"]`).focus();});
 function setFilter(k,v){F[k]=v;CTX=null;L.open=null;L.show=40;renderView();}
 $('#f-period').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('#f-period button').forEach(x=>x.setAttribute('aria-pressed',x===b));setFilter('P',+b.dataset.p);});
 $('#f-trade').addEventListener('change',e=>setFilter('trade',e.target.value));
 $('#f-region').addEventListener('change',e=>setFilter('region',e.target.value));
 $('#f-client').addEventListener('change',e=>setFilter('client',e.target.value));
 
-const VIEWS=['live','business','payments','ledger'];
+const VIEWS=['live','analytics'];
 function select(which){
   view=which;
   VIEWS.forEach(v=>{$('#tab-'+v).setAttribute('aria-selected',v===which);$('#view-'+v).hidden=v!==which;});
@@ -1476,8 +1519,8 @@ function select(which){
 }
 VIEWS.forEach(v=>$('#tab-'+v).addEventListener('click',()=>select(v)));
 document.querySelector('.tabs').addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;const i=VIEWS.indexOf(view),n=VIEWS[(i+(e.key==='ArrowRight'?1:VIEWS.length-1))%VIEWS.length];select(n);$('#tab-'+n).focus();});
-let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(view==='business'){revChart($('#c-rev'));mHist($('#c-mhist'));}if(view==='payments')renderPayments();},120);});
-const h=location.hash.slice(1);if(h==='analytics')select('payments');else if(VIEWS.includes(h))select(h);
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(view==='analytics'&&sub!=='ledger')renderView();},120);});
+const h=location.hash.slice(1);if(h==='analytics')select('analytics');else if(SUBS.includes(h)){select('analytics');selectSub(h);}
 })();
 </script>
 
