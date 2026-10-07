@@ -527,7 +527,7 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
       </div>
     </div>
     <label class="fgroup" for="f-trade">Trade <select class="sel" id="f-trade"></select></label>
-    <label class="fgroup" for="f-region">Region <select class="sel" id="f-region"></select></label>
+    <label class="fgroup" for="f-state">State <select class="sel" id="f-state"></select></label>
     <span class="fnote" id="f-note"></span>
   </div>
 
@@ -588,7 +588,6 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
   <section id="view-analytics" role="tabpanel" aria-labelledby="tab-analytics" hidden>
     <nav class="subtabs" id="subtabs" role="tablist" aria-label="Analytics sections">
       <button class="subtab" role="tab" data-sub="overview" aria-selected="true">Overview</button>
-      <button class="subtab" role="tab" data-sub="profit" aria-selected="false">Profitability</button>
       <button class="subtab" role="tab" data-sub="clients" aria-selected="false">Cash</button>
       <button class="subtab" role="tab" data-sub="speed" aria-selected="false">Payment speed</button>
       <button class="subtab" role="tab" data-sub="review" aria-selected="false">Review</button>
@@ -612,30 +611,6 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
       <div class="panel">
         <div class="panel-h"><h2>Billed, cost and margin</h2><span class="meta" id="b-rev-meta"></span></div>
         <div class="chart" id="c-rev"></div>
-      </div>
-    </div>
-
-    <!-- Profitability -->
-    <div class="sub" id="sub-profit" role="tabpanel" hidden>
-      <div class="grid2">
-        <div class="panel">
-          <div class="panel-h"><h2>Margin on every job</h2><span class="meta">Share of work orders by gross margin</span></div>
-          <div class="chart" id="c-mhist"></div>
-        </div>
-        <div class="panel">
-          <div class="panel-h"><h2>By region</h2><span class="meta">Work orders closed in the period</span></div>
-          <div class="tbl-wrap"><table id="b-regions"></table></div>
-        </div>
-      </div>
-      <div class="grid2 even">
-        <div class="panel">
-          <div class="panel-h"><h2>By trade</h2><span class="meta">Work orders closed in the period</span></div>
-          <div class="tbl-wrap"><table id="b-trades"></table></div>
-        </div>
-        <div class="panel">
-          <div class="panel-h"><h2>Lowest-margin jobs</h2><span class="meta">Below the 25% floor, worst first</span></div>
-          <div class="tbl-wrap"><table id="b-watch"></table></div>
-        </div>
       </div>
     </div>
 
@@ -759,9 +734,9 @@ const CLIENTS=[
   {name:'Bluebird Inns',w:8,terms:60,late:.30,pre:'Inn #'},
   {name:'Halvorsen Bank',w:7,terms:60,late:.05,pre:'Branch #'},
   {name:'Other accounts',w:7,terms:30,late:.22,pre:'Site #'}];
-const CITIES=[['Dallas, TX','Texas'],['Houston, TX','Texas'],['San Antonio, TX','Texas'],['Phoenix, AZ','West'],['Denver, CO','West'],['Las Vegas, NV','West'],
-  ['Atlanta, GA','Southeast'],['Tampa, FL','Southeast'],['Orlando, FL','Southeast'],['Charlotte, NC','Southeast'],['Nashville, TN','Southeast'],['Columbus, OH','Midwest']];
-const REGIONS=['Texas','Southeast','West','Midwest'];
+const CITIES=['Dallas, TX','Houston, TX','San Antonio, TX','Phoenix, AZ','Denver, CO','Las Vegas, NV',
+  'Atlanta, GA','Tampa, FL','Orlando, FL','Charlotte, NC','Nashville, TN','Columbus, OH'];
+const STATES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',DC:'District of Columbia',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming'};
 const METHODS=[{name:'Instant bank transfer',w:71},{name:'Instant to debit card',w:29}];
 const REASONS=[{name:'Above quoted cost',w:30},{name:'First payment to payee',w:22},{name:'Receipt missing',w:18},{name:'Alternate recipient',w:12},{name:'Possible duplicate',w:7},{name:'Rate above vendor card',w:5}];
 const FLOOR='Margin below 25% floor';
@@ -799,7 +774,7 @@ function makeWO(r,d,tClose,trend,seq,pays){
   const quoted=r5(billed*(1-mq));
   const x=r(),types=x<.12?['Completion']:x<.80?(r()<.6?['Trip & diagnostic','Completion']:['Parts advance','Completion']):PTYPES.slice();
   const techId=Math.floor(r()*NTECH);
-  const w={id:'WO-'+seq,day:d,tClose,trade:T.name,client:C.name,terms:C.terms,city:CITIES[ci][0],region:CITIES[ci][1],
+  const w={id:'WO-'+seq,day:d,tClose,trade:T.name,client:C.name,terms:C.terms,city:CITIES[ci],state:CITIES[ci].slice(-2),
     site:C.pre+(100+Math.floor(r()*2900)),techId,tech:techName(techId),billed,quoted,pays:[]};
   const amts=types.map(tp=>tp==='Trip & diagnostic'?r5(quoted*(.14+r()*.08)):tp==='Parts advance'?r5(quoted*(.28+r()*.12)):0);
   amts[amts.length-1]=quoted-amts.reduce((a,b)=>a+b,0);
@@ -901,7 +876,7 @@ function newJourney(){
   const durs=STEPS.map(s=>s.dur+(s.key==='review'&&hiccup?3800:0));
   const starts=[];durs.reduce((a,b,i)=>(starts[i]=a,a+b),0);
   J={job,tech,first,hiccup,client,billed,cost,margin:(billed-cost)/billed,types,earlier,amount,cum,durs,starts,total:starts[7]+durs[7],
-    wo:'WO-'+(65213+jCount*37),site:client.pre+(1142+jCount*311)%3000,city:CITIES[(jCount*5)%CITIES.length][0],
+    wo:'WO-'+(65213+jCount*37),site:client.pre+(1142+jCount*311)%3000,city:CITIES[(jCount*5)%CITIES.length],
     signer:SIGNERS[jCount%SIGNERS.length],ops:OPS[jCount%OPS.length],ap:APS[jCount%APS.length],
     start:nowHours(),ref:'PAY-'+(180700+jCount*13)};
   jCount++;elapsed=0;cur=-1;fired=new Set();finished=false;holdLeft=0;
@@ -1150,14 +1125,14 @@ $('#pause').addEventListener('click',()=>{paused=!paused;$('#pause').textContent
 $('#next').addEventListener('click',()=>{if(MODE==='real'){if(REAL?.jobs.length)pickReal((realSel+1)%REAL.jobs.length);return;}parts=[];newJourney();if(paused){paused=false;$('#pause').textContent='Pause';$('#story').classList.remove('is-paused');}});
 
 /* ══════════════════ ANALYTICS: shared filters ══════════════════ */
-const F={P:30,trade:'',region:''};
+const F={P:30,trade:'',state:''};
 function opts(el,label,list){el.innerHTML=`<option value="">${label}</option>`+list.map(x=>`<option>${esc(x)}</option>`).join('');}
 opts($('#f-trade'),'All trades',TRADES.map(t=>t.name));
-opts($('#f-region'),'All regions',REGIONS);
+$('#f-state').innerHTML='<option value="">All states</option>'+[...new Set(CITIES.map(c=>c.slice(-2)))].sort((a,b)=>STATES[a].localeCompare(STATES[b])).map(s=>`<option value="${s}">${STATES[s]}</option>`).join('');
 
 
 let CTX=null;
-function woMatch(w){return (!F.trade||w.trade===F.trade)&&(!F.region||w.region===F.region);}
+function woMatch(w){return (!F.trade||w.trade===F.trade)&&(!F.state||w.state===F.state);}
 function ctx(){
   if(CTX)return CTX;
   const P=F.P,s=NDAY-P,ps=NDAY-2*P;
@@ -1173,7 +1148,7 @@ function ctx(){
   return CTX;
 }
 function rangeLabel(c){return `Last ${c.P} days · ${fmtD(c.s)} – ${fmtD(NDAY-1)}, 2026`;}
-function filterText(){const f=[F.trade,F.region].filter(Boolean);return f.length?f.join(' · '):'All trades and regions';}
+function filterText(){const f=[F.trade,STATES[F.state]].filter(Boolean);return f.length?f.join(' · '):'All trades and states';}
 
 function delta(cur,prev,goodUp,mode){
   if(!isFinite(cur)||!isFinite(prev)||!prev)return '';
@@ -1211,16 +1186,7 @@ function renderBusiness(){
     kpi('Average job',fmt$(B.avg),`${delta(B.avg,Bp.avg,true)} ${B.ppj.toFixed(2)} payments per job`)
   ].join('');
   $('#b-rev-meta').textContent=c.size===1?'Per day':'Per week';
-  revChart($('#c-rev'));mHist($('#c-mhist'));
-
-  // trades and regions
-  const rowsFor=(key,names,label)=>{
-    const out=names.map(nm=>{const b=biz(c.cur.filter(w=>w[key]===nm));return {nm,b};}).filter(x=>x.b.n).sort((a,b)=>b.b.rev-a.b.rev);
-    return `<thead><tr><th>${label}</th><th class="r">Jobs</th><th class="r">Avg job</th><th class="r">Billed</th><th class="r">Gross profit</th><th class="r">Margin</th></tr></thead><tbody>`+
-      out.map(({nm,b})=>`<tr><td>${esc(nm)}</td><td class="r">${fmtN(b.n)}</td><td class="r">${fmt$(b.avg)}</td><td class="r">${fmtK(b.rev)}</td><td class="r">${fmtK(b.gp)}</td><td class="r">${mgCell(b.mg,true)}</td></tr>`).join('')+'</tbody>';
-  };
-  $('#b-trades').innerHTML=rowsFor('trade',TRADES.map(t=>t.name),'Trade');
-  $('#b-regions').innerHTML=rowsFor('region',REGIONS,'Region');
+  revChart($('#c-rev'));
 
   // cash cycle
   const comp=c.pCur.filter(p=>p.type==='Completion'&&p.ctp!=null).map(p=>p.ctp);
@@ -1237,13 +1203,6 @@ function renderBusiness(){
     <div class="saved"><span class="v">${fmtK(openCost)}</span><span>of technician pay already released on work clients have not paid for yet${notInv.length?` · plus ${fmtK(sum(notInv,w=>w.billed))} not yet invoiced`:''}</span></div>
     <p class="sub-h">Receivables by age, as of Oct 6</p>
     <div class="hbars aging">${ag.map(([n,a])=>`<div class="hb wide"><span class="name">${n}</span><span class="t"><div style="width:${a/amax*100}%"></div></span><span class="pct">${fmtK(a)}</span></div>`).join('')}</div>`;
-
-  // lowest-margin jobs
-  const low=c.cur.filter(w=>w.margin<.25).sort((a,b)=>a.margin-b.margin).slice(0,10);
-  $('#b-watch').innerHTML=low.length?`<thead><tr><th>Work order</th><th>Client</th><th>Trade</th><th class="r">Billed</th><th class="r">Tech cost</th><th class="r">Margin</th><th>Review</th></tr></thead><tbody>`+
-    low.map(w=>{const rv=w.pays.find(p=>p.flagged);return `<tr><td><b>${w.id}</b> <span class="l2">${fmtD(w.day)}</span></td><td>${esc(w.client)}</td><td>${w.trade}</td><td class="r">${fmt$(w.billed)}</td><td class="r">${fmt$(w.cost)}</td><td class="r">${mgCell(w.margin)}</td>
-      <td>${rv?(rv.outcome==='adjusted'?'<span class="pill a">Corrected</span>':rv.outcome==='rejected'?'<span class="pill r">Stopped</span>':'<span class="pill w">Approved after review</span>'):'<span class="pill n">Not held</span>'}</td></tr>`;}).join('')+'</tbody>'
-    :`<tbody><tr><td class="empty">No jobs below 25% in this period.</td></tr></tbody>`;
 }
 
 function revChart(el){
@@ -1274,26 +1233,6 @@ function revChart(el){
   const lb=bk[bk.length-1];if(lb&&isFinite(lb.mg))s+=`<text x="${xc(bk.length-1)-8}" y="${ym(lb.mg)-8}" text-anchor="end" font-size="11.5" font-weight="600" fill="var(--ink)">${fmtP(lb.mg)}</text>`;
   const every=Math.ceil(bk.length/Math.max(1,Math.floor(iw/58)));
   bk.forEach((b,i)=>{if((bk.length-1-i)%every===0)s+=`<text x="${xc(i)}" y="${H-6}" text-anchor="middle" font-size="11" fill="var(--ink-3)">${bkLabel(c,i)}</text>`;});
-  el.innerHTML=s+'</svg>';
-}
-
-function mHist(el){
-  const c=ctx(),vals=c.cur.map(w=>w.margin),N=Math.max(1,vals.length);
-  const W=Math.max(280,el.clientWidth-24),H=340,m={l:36,r:10,t:46,b:28},iw=W-m.l-m.r,ih=H-m.t-m.b;
-  const NB=24,bins=new Array(NB).fill(0);vals.forEach(v=>bins[Math.min(NB-1,Math.max(0,Math.floor(v/.025)))]++);
-  const share=bins.map(b=>b/N*100),ymax=Math.max(5,Math.ceil(Math.max(...share)/5)*5);
-  const bw=iw/NB,x=v=>m.l+v/.6*iw,y=v=>m.t+ih-v/ymax*ih;
-  let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Histogram of gross margin per work order">`;
-  s+=`<rect x="${x(.25)}" y="${m.t}" width="${x(.40)-x(.25)}" height="${ih}" fill="var(--good-soft)"/>`;
-  for(let v=0;v<=ymax;v+=5)s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${m.l-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--ink-3)">${v}%</text>`;
-  share.forEach((v,i)=>{const lo=i*.025,h=ih*v/ymax,col=lo<.25?'var(--warn-fill)':lo<.40?'var(--good-fill)':'var(--accent-fill)';
-    s+=`<rect x="${m.l+i*bw+1}" y="${m.t+ih-h}" width="${Math.max(1,bw-2)}" height="${h}" rx="1.5" fill="${col}"><title>${Math.round(lo*100)}–${Math.round((lo+.025)*1000)/10}% margin: ${v.toFixed(1)}% of jobs</title></rect>`;});
-  for(let v=0;v<=.6001;v+=.1)s+=`<text x="${x(v)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--ink-3)">${Math.round(v*100)}%${v>.59?'+':''}</text>`;
-  const below=vals.filter(v=>v<.25).length/N,inb=vals.filter(v=>v>=.25&&v<=.40).length/N,above=1-below-inb;
-  s+=`<text x="${m.l}" y="14" font-size="11.5" fill="var(--warn)" font-weight="600">Below 25%: ${fmtP(below)}</text>`;
-  s+=`<text x="${m.l}" y="31" font-size="11.5" fill="var(--good)" font-weight="600">Target 25–40%: ${fmtP(inb)}</text>`;
-  s+=`<text x="${W-m.r}" y="14" text-anchor="end" font-size="11.5" fill="var(--accent)" font-weight="600">Above 40%: ${fmtP(above)}</text>`;
-  const md=median(vals);if(isFinite(md))s+=`<line x1="${x(md)}" x2="${x(md)}" y1="${m.t-4}" y2="${m.t+ih}" stroke="var(--ink)" stroke-dasharray="3 3"/><text x="${x(md)+5}" y="${m.t+8}" font-size="11.5" font-weight="600" fill="var(--ink)">Median ${fmtP(md)}</text>`;
   el.innerHTML=s+'</svg>';
 }
 
@@ -1489,7 +1428,7 @@ $('#l-more').addEventListener('click',e=>{if(e.target.id==='l-morebtn'){L.show+=
 /* ── filters + tabs ── */
 let view='live';
 let sub='overview';
-const SUBS=['overview','profit','clients','speed','review','techs','ledger'];
+const SUBS=['overview','clients','speed','review','techs','ledger'];
 function renderView(){
   if(view!=='analytics')return;
   if(sub==='ledger')renderLedger();else{renderBusiness();renderPayments();}
@@ -1500,7 +1439,7 @@ $('#subtabs').addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='A
 function setFilter(k,v){F[k]=v;CTX=null;L.open=null;L.show=40;renderView();}
 $('#f-period').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('#f-period button').forEach(x=>x.setAttribute('aria-pressed',x===b));setFilter('P',+b.dataset.p);});
 $('#f-trade').addEventListener('change',e=>setFilter('trade',e.target.value));
-$('#f-region').addEventListener('change',e=>setFilter('region',e.target.value));
+$('#f-state').addEventListener('change',e=>setFilter('state',e.target.value));
 
 const VIEWS=['live','analytics'];
 function select(which){
