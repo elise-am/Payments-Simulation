@@ -1130,7 +1130,6 @@ function frame(now){
   drawConfetti();
   requestAnimationFrame(frame);
 }
-newJourney();
 requestAnimationFrame(frame);
 
 $('#pause').addEventListener('click',()=>{paused=!paused;$('#pause').textContent=paused?'Resume':'Pause';$('#story').classList.toggle('is-paused',paused);});
@@ -1482,7 +1481,7 @@ const h=location.hash.slice(1);if(h==='analytics')select('analytics');else if(SU
    /api/live returns today's work orders that reached Done/Incurred. The page reads it
    on load, every minute after that, and whenever Refresh is pressed. Payment steps
    stay empty until the Teams payment messages are connected. */
-let MODE='sim',REAL=null,realSel=0,realNextAt=0,realBusy=false,realErr='',simWall='';
+let MODE='real',REAL=null,realSel=0,realNextAt=0,realBusy=false,realErr='',simWall='';
 const REFRESH_MS=60000;
 const tzTime=ms=>new Date(ms).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); // viewer's local time, same as the header clock
 async function loadReal(force){
@@ -1495,43 +1494,38 @@ async function loadReal(force){
       const keep=REAL?.jobs[realSel]?.id;REAL=j;
       const i=keep?j.jobs.findIndex(x=>x.id===keep):-1;realSel=i>=0?i:0;
       realErr=j.stale?'ClickUp did not answer, showing the last good read':'';
-      if(MODE==='sim')setMode('real');else if(MODE==='real')renderReal();
+      renderReal();
     }else{
       realErr=!j?'ClickUp unreachable':j.reason==='not_configured'?'ClickUp not connected yet':j.reason==='locked'?'Real data is locked until a dashboard password is set':'ClickUp error: '+(j.message||'');
     }
   }catch(e){console.error('Live data:',e);realErr=REAL?'Could not show the ClickUp data':'ClickUp unreachable';}
-  realBusy=false;realNextAt=Date.now()+REFRESH_MS;setSrc();
-}
-function setMode(m){
-  if(m==='real'&&!simWall)simWall=$('#wall').innerHTML;
-  MODE=m;
-  $('#pause').hidden=m==='real';
-  if(m==='real'){renderReal();}
-  else{
-    $('#flows-h').innerHTML='<h2>Also on the way</h2><span class="meta">Other payments moving through the same steps</span>';
-    $('#wall-h').innerHTML='<h2>Just paid</h2><span class="meta">Newest first</span>';
-    if(simWall)$('#wall').innerHTML=simWall;
-    $('#notice').hidden=true;$('#goalbar').hidden=true;
-    renderFlows(-1);renderToday();parts=[];newJourney();
-  }
-  setSrc();
+  realBusy=false;realNextAt=Date.now()+REFRESH_MS;setSrc();if(!REAL)renderUnavailable();
 }
 function setSrc(){
   const el=$('#src');if(!el)return;
-  if(view==='analytics'||!REAL){
-    el.innerHTML=`<span class="sim-chip" title="${esc(realErr||'Modeled data for demonstration')}">Simulated data</span>`+(view!=='analytics'&&realErr?`<span class="upd">${esc(realErr)}</span>`:'');
-    return;
-  }
+  if(view==='analytics'){el.innerHTML='<span class="sim-chip" title="Modeled data for demonstration">Simulated data</span>';return;}
   const secs=Math.max(0,Math.ceil((realNextAt-Date.now())/1000));
-  el.innerHTML=`<div class="seg" role="group" aria-label="Data source"><button type="button" data-m="real" aria-pressed="${MODE==='real'}">ClickUp</button><button type="button" data-m="demo" aria-pressed="${MODE!=='real'}">Demo</button></div>
-    <span class="upd">${realBusy?'Refreshing…':`Updated ${tzTime(REAL.asOf)} · next in ${secs}s`}${realErr?` · <b class="mg lo">${esc(realErr)}</b>`:''}</span>
+  const status=realBusy?'Refreshing…':REAL?`Updated ${tzTime(REAL.asOf)} · next in ${secs}s`:(realErr?'':'Connecting to ClickUp…');
+  el.innerHTML=`<span class="upd">${status}${realErr?`${status?' · ':''}<b class="mg lo">${esc(realErr)}</b>`:''}</span>
     <button type="button" class="btn" id="refresh"${realBusy?' disabled':''}>Refresh</button>`;
 }
-$('#src').addEventListener('click',e=>{
-  if(e.target.closest('#refresh')){loadReal(true);return;}
-  const b=e.target.closest('[data-m]');if(!b)return;
-  const m=b.dataset.m==='real'?'real':'demo';if(m!==MODE)setMode(m);
-});
+$('#src').addEventListener('click',e=>{if(e.target.closest('#refresh'))loadReal(true);});
+/* Before the first ClickUp answer, or when ClickUp can't be reached and nothing was loaded yet. */
+function renderUnavailable(){
+  if(REAL)return;
+  const loading=!realErr;
+  $('#pause').hidden=true;$('#next').disabled=true;$('#goalbar').hidden=true;$('#notice').hidden=true;
+  $('#today').innerHTML=['Work orders completed','Jobs with technician paid','Payments released','Average technician cost']
+    .map(l=>`<div class="kpi"><span class="lbl">${l}</span><span class="val num">–</span><span class="sub"></span></div>`).join('');
+  $('#wo-title').textContent=loading?'Loading today’s work orders…':'Couldn’t load today’s work orders';
+  $('#wo-meta').textContent=loading?'Reading ClickUp':realErr+'. Trying again every minute, or press Refresh.';
+  buildJourney();document.querySelectorAll('.band').forEach(b=>b.classList.remove('on','ok'));
+  $('#journey').classList.remove('complete');$('#timer').classList.remove('paid');
+  $('#timer-v').innerHTML='–';$('#timer-s').textContent='';$('#now').innerHTML='';
+  $('#ph-ava').textContent='?';$('#ph-who').textContent='';[...$('#msgs').querySelectorAll('.m')].forEach(n=>n.remove());typing(false);
+  $('#flows-h').innerHTML='<h2>Completed today</h2><span class="meta"></span>';$('#flows').innerHTML='';
+  $('#wall-h').innerHTML='<h2>Just paid</h2><span class="meta">From Teams payment messages</span>';$('#wall').innerHTML='';
+}
 /* Goal view: today's real counts and amounts multiplied by GOAL_X to show the daily goal
    (pace of 4,000 work orders a month). Cards are labeled as the goal; Today shows the real numbers. */
 const GOAL_X=2;
@@ -1551,7 +1545,8 @@ function realKpis(jobs){
     .map(([l,v,s],n)=>`<div class="kpi${n===0?' hero':''}"><span class="lbl">${l}${goalOn&&n===0&&v!=='–'?' <span class="gx">Goal</span>':''}</span><span class="val num">${v}</span><span class="sub">${s}</span></div>`).join('');
 }
 function renderReal(){
-  if(MODE!=='real'||!REAL)return;
+  if(!REAL)return;
+  $('#pause').hidden=true;
   const jobs=REAL.jobs,j=jobs[realSel];
   renderGoalbar();$('#today').innerHTML=realKpis(jobs);
   const warn=REAL.warnings||[];
@@ -1601,7 +1596,8 @@ setInterval(()=>{
   else if(view!=='analytics'&&REAL&&!realBusy){const u=document.querySelector('#src .upd');if(u&&!realErr)u.textContent=`Updated ${tzTime(REAL.asOf)} · next in ${Math.max(0,Math.ceil((realNextAt-Date.now())/1000))}s`;}
   realTimer();
 },1000);
-if(location.protocol.startsWith('http'))loadReal(false);else setSrc();
+renderUnavailable();setSrc();
+if(location.protocol.startsWith('http'))loadReal(false);
 })();
 </script>
 
