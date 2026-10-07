@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Simulated Seamless FM dashboard: live payout journey, how fast technicians are paid, and the work-order ledger.">
+<meta name="description" content="Simulated Seamless FM dashboard: live payout journey, how fast technicians are paid.">
 <title>Seamless Technician Payouts</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700;800&display=swap">
@@ -599,7 +599,6 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
       <button class="subtab" role="tab" data-sub="speed" aria-selected="false">Payment speed</button>
       <button class="subtab" role="tab" data-sub="review" aria-selected="false">Review</button>
       <button class="subtab" role="tab" data-sub="techs" aria-selected="false">Technicians</button>
-      <button class="subtab" role="tab" data-sub="ledger" aria-selected="false">Work orders</button>
     </nav>
 
     <!-- Overview -->
@@ -712,19 +711,6 @@ tr.detail td{background:var(--surface-2);white-space:normal;padding:4px 16px 18p
       <div class="panel">
         <div class="panel-h"><h2>Technicians waiting longest</h2><span class="meta">Highest median wait, technicians with 3+ payments</span></div>
         <div class="tbl-wrap"><table id="techs-slow"></table></div>
-      </div>
-    </div>
-
-    <!-- Work orders -->
-    <div class="sub" id="sub-ledger" role="tabpanel" hidden>
-      <div class="panel">
-        <div class="l-bar">
-          <input type="search" class="srch" id="l-q" placeholder="Search work order, technician, client or site" aria-label="Search work orders">
-          <div class="chipsf" id="l-chips" role="group" aria-label="Show"></div>
-          <span class="l-count" id="l-count"></span>
-        </div>
-        <div class="tbl-wrap"><table id="ledger"></table></div>
-        <div class="more" id="l-more"></div>
       </div>
     </div>
   </section>
@@ -1455,72 +1441,21 @@ function heat(el,paid){
   el.innerHTML=s+'</svg>';
 }
 
-/* ══════════════════ WORK ORDERS LEDGER ══════════════════ */
-const LCHIPS=[['all','All'],['held','Held for review'],['slow','Waited over 2 h'],['multi','2+ payments'],['overdue','Client overdue'],['open','Payment in progress']];
-function longestWait(w){const c=w.pays.filter(p=>p.ctp!=null).map(p=>p.ctp);return c.length?Math.max(...c):NaN;}
-const L={q:'',chip:'all',show:40,open:null};
-function payStatus(p){if(p.tPaid==null)return ['Stopped','r'];if(p.tPaid>NOW)return ['Releasing','a'];if(p.outcome==='adjusted')return ['Corrected, paid','a'];if(p.flagged)return ['Paid after review','w'];return ['Paid','g'];}
-function chipTest(k,w){
-  if(k==='held')return w.flagged;if(k==='slow')return longestWait(w)>2;if(k==='multi')return w.pays.length>1;
-  if(k==='overdue')return w.collectT>NOW&&w.dueT<NOW;if(k==='open')return w.pays.some(p=>p.tPaid!=null&&p.tPaid>NOW);return true;}
-function invCell(w){
-  if(w.invoiceT>NOW)return '<span class="pill n">Invoicing</span>';
-  if(w.collectT<=NOW)return `<span class="pill g">Collected ${fmtD(Math.floor(w.collectT/24))}</span>`;
-  const d=Math.round((NOW-w.dueT)/24);return d>0?`<span class="pill r">${d} d overdue</span>`:`<span class="pill n">Due in ${-d} d</span>`;}
-function renderLedger(){
-  const c=ctx(),q=L.q.trim().toLowerCase();
-  const base=c.cur.filter(w=>!q||(w.id+' '+w.tech+' '+w.client+' '+w.site+' '+w.trade+' '+w.city).toLowerCase().includes(q));
-  $('#l-chips').innerHTML=LCHIPS.map(([k,n])=>`<button type="button" class="chipf" data-k="${k}" aria-pressed="${L.chip===k}">${n}<b>${fmtN(base.filter(w=>chipTest(k,w)).length)}</b></button>`).join('');
-  const rows=base.filter(w=>chipTest(L.chip,w)).sort((a,b)=>b.tClose-a.tClose);
-  $('#l-count').textContent=`Showing ${fmtN(Math.min(L.show,rows.length))} of ${fmtN(rows.length)} work orders · ${rangeLabel(c)}`;
-  const head=`<thead><tr><th>Work order</th><th>Closed</th><th>Client · site</th><th>Trade</th><th>Technician</th><th class="r">Paid to tech</th><th class="r">Longest wait</th><th>Payments</th><th>Client invoice</th></tr></thead>`;
-  if(!rows.length){$('#ledger').innerHTML=head+'<tbody><tr><td colspan="9" class="empty">No work orders match. Clear the search or pick another filter.</td></tr></tbody>';$('#l-more').innerHTML='';return;}
-  $('#ledger').innerHTML=head+'<tbody>'+rows.slice(0,L.show).map(w=>{
-    const open=L.open===w.id;
-    const dots=w.pays.map(p=>{const[t,cl]=payStatus(p);return `<i class="${cl==='g'?'':cl}" title="${p.type}: ${t}"></i>`;}).join('');
-    return `<tr class="row${open?' open':''}" data-id="${w.id}" tabindex="0" aria-expanded="${open}"><td><b><span class="car" aria-hidden="true">›</span> ${w.id}</b></td><td>${fmtDT(w.tClose)}</td><td>${esc(w.client)} <span class="l2">${w.site}</span></td><td>${w.trade}</td><td>${w.tech}</td>
-      <td class="r">${fmt$(w.cost)}</td><td class="r">${waitCell(longestWait(w))}</td><td>${w.pays.length}<span class="pd-dots">${dots}</span></td><td>${invCell(w)}</td></tr>`+(open?detailRow(w):'');
-  }).join('')+'</tbody>';
-  $('#l-more').innerHTML=rows.length>L.show?`<button type="button" class="btn" id="l-morebtn">Show ${Math.min(40,rows.length-L.show)} more</button>`:'';
-}
-function detailRow(w){
-  const pays=w.pays.map(p=>{const[t,cl]=payStatus(p);
-    const rv=p.flagged?`<div>Held: <b>${p.reasons.join(', ')}</b> · reviewed by ${p.reviewer} in ${fmtH(p.review)}${p.outcome==='adjusted'?` · corrected ${fmt$(p.amount)} → ${fmt$(p.paidAmount)}`:p.outcome==='rejected'?' · payment stopped':''}</div>`:'';
-    return `<div class="pay"><div class="top"><b>${p.idx} of ${p.of} · ${p.type}</b><span class="pill ${cl}">${t}</span><span class="amt">${p.outcome==='adjusted'?`<s>${usd2.format(p.amount)}</s>`:''}${usd2.format(p.paidAmount)}</span></div>
-      <div>Signed off ${fmtDT(p.tTrigger)}${p.tPaid!=null?` → ${p.tPaid>NOW?'expected':'paid'} ${fmtDT(p.tPaid)} <b>(${fmtH(p.ctp)})</b>`:''} · ${p.method}</div>${rv}</div>`;}).join('');
-  const adj=w.quoted-w.cost;
-  const inv=w.invoiceT>NOW?'Not invoiced yet':w.collectT<=NOW?`Collected ${fmtD(Math.floor(w.collectT/24))} · ${Math.round((w.collectT-w.invoiceT)/24)} days after invoice`:(w.dueT<NOW?`${Math.round((NOW-w.dueT)/24)} days overdue`:`Due ${fmtD(Math.floor(w.dueT/24))}`);
-  const waits=w.pays.filter(p=>p.ctp!=null).map(p=>p.ctp);
-  return `<tr class="detail"><td colspan="9"><div class="det">
-    <div><h4>Payments to ${w.tech}</h4><div class="pays">${pays}</div></div>
-    <div><h4>Payment summary</h4><div class="kv"><span>Quoted to technician</span><b>${usd2.format(w.quoted)}</b>
-      ${adj?`<span>Review corrections</span><b>−${usd2.format(adj)}</b>`:''}<span class="tot">Paid to technician</span><b class="tot">${usd2.format(w.cost)}</b>
-      <span>Fastest payment</span><b>${waits.length?fmtH(Math.min(...waits)):'–'}</b><span>Longest wait</span><b>${waitCell(longestWait(w))}</b></div></div>
-    <div><h4>Client invoice</h4><div class="kv"><span>Client</span><b>${esc(w.client)}</b><span>Site</span><b>${w.site} · ${w.city}</b><span>Invoiced</span><b>${w.invoiceT>NOW?'–':fmtD(Math.floor(w.invoiceT/24))}</b>
-      <span>Terms</span><b>Net ${w.terms}</b><span>Status</span><b>${inv}</b><span>Cash fronted</span><b>${w.collectT>NOW?usd2.format(w.cost):'Settled'}</b></div></div>
-  </div></td></tr>`;
-}
-$('#l-q').addEventListener('input',e=>{L.q=e.target.value;L.show=40;renderLedger();});
-$('#l-chips').addEventListener('click',e=>{const b=e.target.closest('.chipf');if(!b)return;L.chip=b.dataset.k;L.show=40;renderLedger();});
-$('#ledger').addEventListener('click',e=>{const tr=e.target.closest('tr.row');if(!tr)return;L.open=L.open===tr.dataset.id?null:tr.dataset.id;renderLedger();const n=document.querySelector(`tr.row[data-id="${tr.dataset.id}"]`);if(n)n.focus();});
-$('#ledger').addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const tr=e.target.closest('tr.row');if(!tr)return;e.preventDefault();tr.click();});
-$('#l-more').addEventListener('click',e=>{if(e.target.id==='l-morebtn'){L.show+=40;renderLedger();}});
-
 // Sign out shows only when the password gate signed this browser in (middleware.js sets sfm_auth)
 try{$('#signout').hidden=!/(^|; )sfm_auth=1(;|$)/.test(document.cookie);}catch{}
 
 /* ── filters + tabs ── */
 let view='live';
 let sub='overview';
-const SUBS=['overview','clients','speed','review','techs','ledger'];
+const SUBS=['overview','clients','speed','review','techs'];
 function renderView(){
   if(view!=='analytics')return;
-  if(sub==='ledger')renderLedger();else{renderOverview();renderPayments();}
+  renderOverview();renderPayments();
   const c=ctx();$('#f-note').innerHTML=`<b>${fmtN(c.cur.length)}</b> work orders · <b>${fmtN(c.pCur.length)}</b> payments in view`;}
 function selectSub(k){sub=k;document.querySelectorAll('.subtab').forEach(b=>b.setAttribute('aria-selected',b.dataset.sub===k));SUBS.forEach(x=>$('#sub-'+x).hidden=x!==k);renderView();}
 $('#subtabs').addEventListener('click',e=>{const b=e.target.closest('.subtab');if(b)selectSub(b.dataset.sub);});
 $('#subtabs').addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;const i=SUBS.indexOf(sub),n=SUBS[(i+(e.key==='ArrowRight'?1:SUBS.length-1))%SUBS.length];selectSub(n);document.querySelector(`.subtab[data-sub="${n}"]`).focus();});
-function setFilter(k,v){F[k]=v;CTX=null;L.open=null;L.show=40;renderView();}
+function setFilter(k,v){F[k]=v;CTX=null;renderView();}
 $('#f-period').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('#f-period button').forEach(x=>x.setAttribute('aria-pressed',x===b));setFilter('P',+b.dataset.p);});
 $('#f-trade').addEventListener('change',e=>setFilter('trade',e.target.value));
 $('#f-region').addEventListener('change',e=>{F.region=e.target.value;stateOpts();setFilter('region',F.region);});
@@ -1536,7 +1471,7 @@ function select(which){
 }
 VIEWS.forEach(v=>$('#tab-'+v).addEventListener('click',()=>select(v)));
 document.querySelector('.tabs').addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;const i=VIEWS.indexOf(view),n=VIEWS[(i+(e.key==='ArrowRight'?1:VIEWS.length-1))%VIEWS.length];select(n);$('#tab-'+n).focus();});
-let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(view==='analytics'&&sub!=='ledger')renderView();},120);});
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(view==='analytics')renderView();},120);});
 
 /* ══════════════════ REAL DATA: ClickUp jobs on the Live page ══════════════════
    /api/live returns today's work orders that reached Done/Incurred. The page reads it
