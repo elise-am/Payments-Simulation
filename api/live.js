@@ -34,6 +34,7 @@ let lastResult = null;
 let lastAt = 0;
 const doneAtCache = new Map(); // task id → ms the task entered its done status
 const titleCache = new Map(); // task id + description hash → short title
+let aiError = ""; // last AI title failure, reported in warnings
 
 async function cuGet(path) {
   const res = await fetch(API + path, {
@@ -156,13 +157,11 @@ async function aiTitles(items) {
   for (let i = 0; i < items.length; i += 25) {
     const batch = items.slice(i, i + 25);
     try {
-      const response = await client.beta.messages.create({
-        model: "claude-opus-5-5",
+      // Claude Haiku 4.5: the cheapest current model, plenty for a 3-7 word title.
+      const response = await client.messages.create({
+        model: "claude-haiku-4-5",
         max_tokens: 4000,
-        betas: ["server-side-fallback-2026-07-01"],
-        fallbacks: "default",
         output_config: {
-          effort: "low",
           format: {
             type: "json_schema",
             schema: {
@@ -181,9 +180,10 @@ async function aiTitles(items) {
       const text = response.content.filter((b) => b.type === "text").map((b) => b.text).join("");
       for (const t of JSON.parse(text).titles ?? []) if (t.title) out.set(t.id, t.title.trim());
     } catch (err) {
-      if (err instanceof Anthropic.RateLimitError) console.warn("AI titles: rate limited");
-      else if (err instanceof Anthropic.APIError) console.warn(`AI titles: API error ${err.status}: ${err.message}`);
-      else console.warn("AI titles failed:", err?.message ?? err);
+      if (err instanceof Anthropic.RateLimitError) aiError = "AI titles: rate limited";
+      else if (err instanceof Anthropic.APIError) aiError = `AI titles: API error ${err.status}: ${String(err.message).slice(0, 200)}`;
+      else aiError = "AI titles failed: " + String(err?.message ?? err).slice(0, 200);
+      console.warn(aiError);
     }
   }
   return out;
@@ -212,6 +212,7 @@ async function build() {
   const keyOf = (t) => t.id + ":" + hash(descOf(t));
   const missing = today.filter(([t]) => !titleCache.has(keyOf(t)) && descOf(t)).map(([t]) => ({ id: t.id, description: descOf(t) }));
   const fresh = await aiTitles(missing);
+  if (fresh.size) aiError = "";
   for (const [t] of today) {
     const k = keyOf(t);
     if (fresh.has(t.id)) titleCache.set(k, fresh.get(t.id));
@@ -240,6 +241,7 @@ async function build() {
 
   const warnings = [];
   for (const [k, n] of Object.entries(names)) if (jobs.length && !jobs.some((j) => j[k] !== "" && j[k] !== null)) warnings.push(`No value found in the "${n}" field on any of today's tasks`);
+  if (aiError) warnings.push(aiError);
   if (!env("ANTHROPIC_API_KEY")) warnings.push("ANTHROPIC_API_KEY is not set, so titles use the first sentence of the description");
 
   const statusesSeen = [...new Set(updated.map((t) => t.status?.status).filter(Boolean))].sort();
