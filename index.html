@@ -1106,8 +1106,8 @@ function renderPS(){
   const S=PS.summary,now=PS.asOf,T=S.completeToPaid,Q=S.requestToPaid,teams=PS.teamsConnected;
   $('#ps-range').textContent=`Today since ${clk(PS.since)} · SFM · ClickUp${teams?' and Teams':''}`;
   $('#ps-headline').innerHTML=!teams?`<em>${fmtN(S.completed)}</em> SFM job${S.completed===1?'':'s'} completed today. Payment times appear once Teams is connected.`
-    :T.n?`Today, technicians are paid a median of <em>${dur(T.median)}</em> after the job is completed.`
-    :Q.n?`Today, payment requests are paid a median of <em>${dur(Q.median)}</em> after they are sent.`
+    :T.n?`Today, technicians are paid within <em>${dur(T.median)}</em> after the job is completed.`
+    :Q.n?`Today, payment requests are paid within <em>${dur(Q.median)}</em> after they are sent.`
     :'No SFM payments yet today.';
 
   // the three steps, with the time between them
