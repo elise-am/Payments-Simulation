@@ -1626,7 +1626,7 @@ function renderReal(){
   }else{
     $('#next').disabled=jobs.length<2;
     $('#wo-title').textContent=j.title;
-    $('#wo-meta').innerHTML=`<b>${esc(j.wo)}</b> · ${esc(j.trade||'Trade not set')} · ${esc(j.fm||'FM not set')} · Cost <b>${j.cost!=null?usd2.format(j.cost):'not set'}</b> · Technician <b>from Teams</b>${j.url?` · <a href="${esc(j.url)}" target="_blank" rel="noopener">Open in ClickUp</a>`:''}`;
+    $('#wo-meta').innerHTML=`<b>${esc(j.wo)}</b> · ${esc(j.trade||'Trade not set')} · ${esc(j.fm||'FM not set')} · Technician <b>from Teams</b>`;
     const st=$('#st-0');st.classList.add('done');st.querySelector('.when').textContent=tzTime(j.completedAt);
     $('#now').innerHTML=head('Field','Job completed',`${esc(j.wo)} moved to ${esc(j.status)} in ClickUp at ${tzTime(j.completedAt)}.`)+
       `<div class="prior">The next steps fill in from the Teams payment messages: technician name, amount and payment method when the payment is issued, then the time the technician is paid.${j.titleFromAi?'':' Title taken from the description (AI titles are off or still loading).'}</div>`;
