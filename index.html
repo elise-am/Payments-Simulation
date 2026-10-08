@@ -727,6 +727,7 @@ body[data-view="analytics"] .bar>.src{display:none}
 
 </div>
 
+<script src="demo-jobs.js"></script>
 <script>
 (function(){
 'use strict';
@@ -772,6 +773,12 @@ const STATES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California
 const REGIONS={Northeast:'CT ME MA NH RI VT NJ NY PA',Midwest:'IL IN MI OH WI IA KS MN MO NE ND SD',
   South:'DE DC FL GA MD NC SC VA WV AL KY MS TN AR LA OK TX',West:'AZ CO ID MT NV NM UT WY AK CA HI OR WA'};
 const REGION_OF={};for(const[r,list]of Object.entries(REGIONS))for(const s of list.split(' '))REGION_OF[s]=r;
+/* Real completed SFM work orders (demo-jobs.js): client, store, city, trade, title and work done are real;
+   amounts and timings are modeled. */
+const WOS=(window.DEMO_WOS||[]).map(([wo,client,store,city,state,trade,title,work,tech])=>({wo,client,store,city,state,trade,title,work,tech}));
+const woAt=r=>WOS[Math.floor(r()*WOS.length)];
+// technician cost per job: about $590 on average, most jobs between $400 and $850
+function demoCost(r){return r5(Math.min(1600,Math.max(220,logn(r,560,.32))));}
 const METHODS=[{name:'ACH / Bank Transfer',w:55,rel:1},{name:'Credit Over the Phone',w:28,rel:.8},{name:'Checks',w:12,rel:3},{name:'Zelle & Cash App',note:'Last resort only',w:5,rel:.9}];
 const REASONS=[{name:'Above quoted cost',w:30},{name:'First payment to payee',w:22},{name:'Receipt missing',w:18},{name:'Alternate recipient',w:12},{name:'Possible duplicate',w:7},{name:'Rate above vendor card',w:5}];
 const FLOOR='Above quoted cost';
@@ -803,14 +810,16 @@ function payTiming(r,trend,type,lowMargin){
 }
 
 function makeWO(r,d,tClose,trend,seq,pays){
-  const T=wpick(r,TRADES),C=wpick(r,CLIENTS),ci=Math.floor(r()*CITIES.length);
-  const billed=Math.min(6500,Math.max(95,r5(logn(r,T.mean/Math.exp(T.sig*T.sig/2),T.sig))));
+  const src=WOS.length?woAt(r):null;
+  const T=src?(TRADES.find(t=>t.name===src.trade)||{name:src.trade,mg:.33}):wpick(r,TRADES),C=wpick(r,CLIENTS),ci=Math.floor(r()*CITIES.length);
   const mq=Math.min(.58,Math.max(.06,T.mg+gauss(r)*.055));
-  const quoted=r5(billed*(1-mq));
+  const quoted=demoCost(r),billed=r5(quoted/(1-mq));
   const x=r(),types=x<.12?['Completion']:x<.80?(r()<.6?['Trip & diagnostic','Completion']:['Parts advance','Completion']):PTYPES.slice();
   const techId=Math.floor(r()*NTECH);
-  const w={id:'WO-'+seq,day:d,tClose,trade:T.name,client:C.name,terms:C.terms,city:CITIES[ci],state:CITIES[ci].slice(-2),
-    site:C.pre+(100+Math.floor(r()*2900)),techId,tech:techName(techId),billed,quoted,pays:[]};
+  const w=src?{id:src.wo,day:d,tClose,trade:T.name,client:src.client,terms:C.terms,city:src.city+', '+src.state,state:src.state,
+      site:src.store,techId,tech:src.tech||techName(techId),billed,quoted,pays:[]}
+    :{id:'WO-'+seq,day:d,tClose,trade:T.name,client:C.name,terms:C.terms,city:CITIES[ci],state:CITIES[ci].slice(-2),
+      site:C.pre+(100+Math.floor(r()*2900)),techId,tech:techName(techId),billed,quoted,pays:[]};
   const amts=types.map(tp=>tp==='Trip & diagnostic'?r5(quoted*(.14+r()*.08)):tp==='Parts advance'?r5(quoted*(.28+r()*.12)):0);
   amts[amts.length-1]=quoted-amts.reduce((a,b)=>a+b,0);
   const trig=[];trig[types.length-1]=tClose;
@@ -837,7 +846,7 @@ const DATA=(function(){
   for(let d=0;d<NDAY;d++){
     const dow=dDate(d).getDay(),wk=(dow===0||dow===6)?.45:1;
     const growth=.9+.15*(d/(NDAY-1)),trend=1.1-.2*(d/(NDAY-1));
-    const n=Math.round(150*growth*wk*(.9+r()*.2)),day=[];
+    const n=Math.round(165*growth*wk*(.9+r()*.2)),day=[]; // about 168 work orders on a weekday
     for(let i=0;i<n;i++){let h;do{h=r()*24;}while(r()>shape(h));day.push(d*24+h);}
     day.sort((a,b)=>a-b).forEach(t=>wos.push(makeWO(r,d,t,trend,seq++,pays)));
   }
@@ -880,6 +889,9 @@ const JOBS=[
   {trade:'Electrical',title:'Back hallway lights and exit sign out',billed:600,work:['Two fixtures replaced','Exit sign battery tested','Breaker labeled in panel'],photos:['Fixtures','Exit sign','Panel','Hallway']},
   {trade:'Handyman',title:'Front entry door closer broken',billed:380,work:['Door closer replaced','Swing speed adjusted','Latch tested ten times'],photos:['Closer','Hinge','Latch','Entry']},
 ];
+const PHOTO_SETS={HVAC:['Unit','Repair','Readings','Area'],Refrigeration:['Unit','Repair','Temperature','Area'],Plumbing:['Before','Repair','Fixture','Area'],
+  Electrical:['Panel','Repair','Fixture','Area'],Appliance:['Unit','Repair','Test','Area'],Handyman:['Before','Repair','Finished','Area'],Locksmith:['Door','Lock','Keys','Entry']};
+const PHOTOS_OF=t=>PHOTO_SETS[t]||['Before','Repair','Finished','Area'];
 const PATTERNS=[['Trip & diagnostic','Completion'],['Completion'],PTYPES,['Parts advance','Completion']];
 const SIGNERS=[['J. Alvarez','Store Manager'],['K. Thompson','Facility Manager'],['R. Patel','General Manager'],['S. Nguyen','Shift Lead']];
 const OPS=['Priya S.','Luis M.','Tasha B.'];
@@ -891,31 +903,33 @@ const R=mulberry32(77031);
 let J=null,jCount=0,elapsed=0,paused=false,cur=-1,fired=new Set(),finished=false,holdLeft=0;
 
 function newJourney(){
-  const job=JOBS[jCount%JOBS.length];
-  const first=FIRST[(jCount*7+3)%FIRST.length];
-  const tech=first+' '+LASTI[(jCount*5+11)%LASTI.length]+'.';
-  const hiccup=jCount%2===1;
-  const client=CLIENTS[(jCount*3)%8];
-  const billed=r5(job.billed*(.9+R()*.25));
+  const w=WOS.length?woAt(R):null;
+  const job=w?{trade:w.trade,title:w.title,work:w.work,photos:PHOTOS_OF(w.trade)}:JOBS[jCount%JOBS.length];
+  const tech=w?.tech||FIRST[(jCount*7+3)%FIRST.length]+' '+LASTI[(jCount*5+11)%LASTI.length]+'.';
+  const first=tech.split(' ')[0];
+  const hiccup=jCount%3===1;
+  const client=w?{name:w.client,terms:[30,30,45,60][jCount%4]}:CLIENTS[(jCount*3)%8];
   const margin=.27+R()*.11;
-  const cost=r5(billed*(1-margin));
+  const cost=demoCost(R),billed=r5(cost/(1-margin));
   const types=PATTERNS[jCount%PATTERNS.length];
   const earlier=types.slice(0,-1).map(t=>({type:t,amt:r5(cost*(t==='Parts advance'?.34:.18)),ago:t==='Parts advance'?'yesterday':'2 days ago'}));
   const amount=cost-earlier.reduce((a,b)=>a+b.amt,0);
-  const T=10+R()*5,wts=[hiccup?.42:.32,.12,.26,.18,.12],ws=wts.reduce((a,b)=>a+b,0);
-  const mins=[0,5+R()*6,4+R()*6,...wts.map(w=>w/ws*T)];
+  // realistic minutes after the previous step: sign-off, photos, ops review (longer when a retake is needed),
+  // payment triggered, issued (the 👍 in the payments chat), bank confirmed, money in the technician's hands
+  const span=(a,b)=>a+R()*(b-a);
+  const mins=[0,span(3,12),span(6,20),span(18,55)+(hiccup?span(20,40):0),span(3,12),span(20,95),span(10,45),span(1,6)];
   const cum=[];mins.reduce((a,b,i)=>(cum[i]=a+b),0);
   const durs=STEPS.map(s=>s.dur+(s.key==='review'&&hiccup?3800:0));
   const starts=[];durs.reduce((a,b,i)=>(starts[i]=a,a+b),0);
   J={job,tech,first,hiccup,client,billed,cost,types,earlier,amount,cum,durs,starts,total:starts[7]+durs[7],
-    wo:'WO-'+(65213+jCount*37),site:client.pre+(1142+jCount*311)%3000,city:CITIES[(jCount*5)%CITIES.length],
+    wo:w?w.wo:'WO-'+(65213+jCount*37),site:w?w.store:client.pre+(1142+jCount*311)%3000,city:w?w.city+', '+w.state:CITIES[(jCount*5)%CITIES.length],
     signer:SIGNERS[jCount%SIGNERS.length],ops:OPS[jCount%OPS.length],ap:APS[jCount%APS.length],
-    start:nowHours(),ref:'PAY-'+(180700+jCount*13)};
+    start:nowHours()-cum[7]/60,ref:'PAY-'+(180700+jCount*13)};
   jCount++;elapsed=0;cur=-1;fired=new Set();finished=false;holdLeft=0;
   if(jCount>1)jobClosed();
 
   $('#wo-title').textContent=job.title;
-  $('#wo-meta').innerHTML=`<b>${J.wo}</b> · ${job.trade} · ${esc(client.name)} ${J.site}, ${J.city} · Technician <b>${tech}</b>`;
+  $('#wo-meta').innerHTML=`<b>${esc(J.wo)}</b> · ${esc(job.trade)} · ${esc(client.name)} · ${esc(J.site)}, ${esc(J.city)} · Technician <b>${esc(tech)}</b>`;
   $('#timer').classList.remove('paid');
   $('#timer-lbl').textContent='Since job completed';
   $('#timer-s').textContent='Completed '+clockStr(J.start);
@@ -949,8 +963,8 @@ function priorHTML(){
 function enterStep(i){
   const s=STEPS[i],t=J.start+J.cum[i]/60,now=$('#now'),n=J.types.length;
   let h='';
-  if(s.key==='done')h=head('Field','Job completed on site',`${J.tech} finished the work at ${esc(J.client.name)} ${J.site} and checked out at ${clockStr(J.start)}.`)+
-    `<ul class="checks">${J.job.work.map((w,k)=>`<li id="ck-${k}"><span class="cb">${ic('check')}</span>${w}</li>`).join('')}</ul>`+priorHTML();
+  if(s.key==='done')h=head('Field','Job completed on site',`${esc(J.tech)} finished the work at ${esc(J.site)} in ${esc(J.city)} and checked out at ${clockStr(J.start)}.`)+
+    `<ul class="checks">${J.job.work.map((w,k)=>`<li id="ck-${k}"><span class="cb">${ic('check')}</span>${esc(w)}</li>`).join('')}</ul>`+priorHTML();
   if(s.key==='sign')h=head('Field','Site manager sign-off','The customer confirms the work is done before anything moves.')+
     `<div class="sig"><div class="pad" id="pad"><span class="x">×</span><svg viewBox="0 0 240 80" preserveAspectRatio="xMidYMid meet"><path d="${SIG}" pathLength="1"/></svg></div>
      <div class="signed" id="signed"><b>${J.signer[1]}</b>Signed ${clockStr(t)}</div></div>`;
@@ -1114,15 +1128,15 @@ tickDate();setInterval(tickDate,15000);
 /* ambient: other payments moving through the same eight steps */
 const FR=mulberry32(5150);let flows=[],woSeq=65400;
 function newFlow(minStep,maxStep){
-  const job=JOBS[Math.floor(FR()*JOBS.length)];
+  const w=WOS.length?woAt(FR):null,job=w||JOBS[Math.floor(FR()*JOBS.length)];
   const pat=PATTERNS[Math.floor(FR()*PATTERNS.length)],j=Math.floor(FR()*pat.length);
-  const billed=r5(job.billed*(.85+FR()*.35)),cost=r5(billed*(1-(.26+FR()*.13)));
+  const cost=demoCost(FR),billed=r5(cost/(1-(.26+FR()*.13)));
   const amt=pat[j]==='Completion'?r5(cost*(pat.length===1?1:pat.length===2?.8:.5)):r5(cost*(pat[j]==='Parts advance'?.34:.18));
-  return {name:pick(FR,FIRST)+' '+LASTI[Math.floor(FR()*LASTI.length)]+'.',trade:job.trade,wo:'WO-'+(woSeq++),
+  return {name:w?.tech||pick(FR,FIRST)+' '+LASTI[Math.floor(FR()*LASTI.length)]+'.',trade:job.trade,wo:w?w.wo:'WO-'+(woSeq++),
     type:pat[j],label:pat[j]+' · '+(j+1)+' of '+pat.length,billed,cost,amt,step:minStep+Math.floor(FR()*(maxStep-minStep+1))};
 }
 function renderFlows(justIdx){
-  $('#flows').innerHTML=flows.map((f,n)=>`<li class="flow${n===justIdx?' just':''}"><div class="who"><b>${f.name} · ${fmt$(f.amt)}</b><span>${f.wo} · ${f.trade} · <span class="ty">${f.label}</span></span></div>
+  $('#flows').innerHTML=flows.map((f,n)=>`<li class="flow${n===justIdx?' just':''}"><div class="who"><b>${esc(f.name)} · ${fmt$(f.amt)}</b><span>${esc(f.wo)} · ${esc(f.trade)} · <span class="ty">${f.label}</span></span></div>
     <div class="dots" aria-hidden="true">${STEPS.map((_,k)=>`<i class="${k<f.step?'d':k===f.step?'a':''}"></i>`).join('')}</div>
     <div class="st">${STEPS[f.step].label}</div></li>`).join('');
 }
@@ -1212,11 +1226,11 @@ function demoSchedule(){
   const wait=(fast,mid_,slow)=>{const x=R();return (x<.72?fast[0]+R()*(fast[1]-fast[0]):x<.94?mid_[0]+R()*(mid_[1]-mid_[0]):slow[0]+R()*(slow[1]-slow[0]))*M;};
   const jobs=[];let t=start+R()*20*M,n=0;
   while(t<end){
-    const [trade,title,billed]=DEMO_JOBS[Math.floor(R()*DEMO_JOBS.length)];
+    const w=WOS.length?woAt(R):null,[trade,title]=w?[w.trade,w.title]:DEMO_JOBS[Math.floor(R()*DEMO_JOBS.length)];
     const req=t+wait([3,18],[18,55],[60,140]),paid=req+wait([2,22],[22,65],[65,170]);
-    jobs.push({wo:'WO-'+(71240+n*17),title,trade,state:DEMO_STATES[Math.floor(R()*DEMO_STATES.length)],tech:FIRST[Math.floor(R()*FIRST.length)]+' '+LASTI[Math.floor(R()*LASTI.length)]+'.',
-      amount:r5(billed*(.55+R()*.2)),completedAt:t,req,paid});
-    t+=(6+R()*12)*M;n++;
+    jobs.push({wo:w?w.wo:'WO-'+(71240+n*17),title,trade,state:w?w.state:DEMO_STATES[Math.floor(R()*DEMO_STATES.length)],tech:w?.tech||FIRST[Math.floor(R()*FIRST.length)]+' '+LASTI[Math.floor(R()*LASTI.length)]+'.',
+      amount:demoCost(R),completedAt:t,req,paid});
+    t+=(2.5+R()*4.5)*M;n++; // about 168 work orders over the working day
   }
   return demoDay={key,since:mid,jobs};
 }
@@ -1363,7 +1377,7 @@ function opts(el,label,list){el.innerHTML=`<option value="">${label}</option>`+l
 // real trades come from ClickUp, so the list follows whatever data is showing
 let tradeList='';
 function tradeOpts(){
-  const list=MODE==='real'?[...new Set((PS?.rows||[]).map(r=>r.trade).filter(Boolean))].sort():TRADES.map(t=>t.name);
+  const list=WOS.length?[...new Set(WOS.map(w=>w.trade))].sort():TRADES.map(t=>t.name);
   if(list.join('|')===tradeList)return;tradeList=list.join('|');
   if(F.trade&&!list.includes(F.trade)){F.trade='';CTX=null;}
   opts($('#f-trade'),'All trades',list);$('#f-trade').value=F.trade;
@@ -1372,7 +1386,7 @@ opts($('#f-trade'),'All trades',TRADES.map(t=>t.name)); // tradeOpts() takes ove
 opts($('#f-region'),'All regions',Object.keys(REGIONS));
 // State list follows the chosen region
 function stateOpts(){
-  const list=[...new Set(CITIES.map(c=>c.slice(-2)))].filter(s=>!F.region||REGION_OF[s]===F.region).sort((a,b)=>STATES[a].localeCompare(STATES[b]));
+  const list=[...new Set(WOS.length?WOS.map(w=>w.state):CITIES.map(c=>c.slice(-2)))].filter(s=>STATES[s]&&(!F.region||REGION_OF[s]===F.region)).sort((a,b)=>STATES[a].localeCompare(STATES[b]));
   if(F.state&&!list.includes(F.state))F.state='';
   $('#f-state').innerHTML='<option value="">All states</option>'+list.map(s=>`<option value="${s}">${STATES[s]}</option>`).join('');
   $('#f-state').value=F.state;
