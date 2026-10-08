@@ -913,11 +913,13 @@ const PICS=[['curb-stops','Parking stops',['Handyman','Overhead Door']],['grate'
   ['floor-drain','Floor drain',['Plumbing','Refrigeration','Janitorial']],['beverage-lines','Beverage lines',['Refrigeration','Plumbing','Appliance']],
   ['restroom-partitions','Partitions',['Handyman','Locksmith','Janitorial']],['water-heater','Water heater',['Plumbing','Electrical','Appliance']]];
 const WENDYS_PICS=[['wendys-sign','Exterior'],['wendys-storefront','Storefront']];
-function pickPics(trade,store){const r=mulberry32(5003+jCount*7919);
+const RISER_PIC=['riser-studio','Studio']; // Riser Fitness jobs always show their own studio
+function pickPics(trade,store,client){const r=mulberry32(5003+jCount*7919);
   let pool=PICS.filter(p=>p[2].includes(trade));
   if(pool.length<2)pool=pool.concat(PICS.filter(p=>p[2].includes('Handyman')&&!pool.includes(p)));
   for(let i=pool.length-1;i>0;i--){const k=Math.floor(r()*(i+1));[pool[i],pool[k]]=[pool[k],pool[i]];}
-  // one photo per work order; a Wendy's job always shows one of its own
+  // one photo per work order; Riser Fitness and Wendy's jobs always show one of their own
+  if(/riser/i.test(client||''))return [RISER_PIC];
   return [/wendy/i.test(store||'')?WENDYS_PICS[Math.floor(r()*WENDYS_PICS.length)]:pool[0]];}
 const picURL=f=>'photos/'+f+'.jpg';
 const SIG='M4 58 C 16 18, 34 12, 30 52 S 40 70, 52 40 S 66 18, 70 46 S 80 66, 92 38 C 100 22, 112 26, 106 50 S 122 64, 134 36 S 150 30, 156 48 S 170 58, 186 34 C 194 24, 204 30, 200 46 M 120 70 C 150 62, 190 60, 236 62';
@@ -928,7 +930,7 @@ let J=null,jCount=0,elapsed=0,paused=false,cur=-1,fired=new Set(),finished=false
 function newJourney(){
   const w=WOS.length?woAt(R):null;
   const base=w?{trade:w.trade,title:w.title,work:w.work}:JOBS[jCount%JOBS.length];
-  const pics=pickPics(base.trade,w?.store);
+  const pics=pickPics(base.trade,w?.store,w?.client);
   const job={...base,pics:pics.map(p=>p[0]),photos:pics.map(p=>p[1])};
   const tech=w?.tech||FIRST[(jCount*7+3)%FIRST.length]+' '+LASTI[(jCount*5+11)%LASTI.length]+'.';
   const first=tech.split(' ')[0];
