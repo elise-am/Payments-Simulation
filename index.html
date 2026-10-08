@@ -110,7 +110,7 @@ svg.i{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .wo h2{margin:4px 0 4px;font-family:var(--font-num);font-weight:700;font-size:clamp(24px,2.6vw,32px);line-height:1.1;text-wrap:balance}
 .wo .meta{color:var(--ink-2);font-size:13.5px}
 .wo .meta b{color:var(--ink);font-weight:600}
-.timer{text-align:right;min-width:150px}
+.timer{text-align:right;min-width:150px;margin-left:auto} /* stays on the right, also when it wraps under the title */
 .timer .lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
 .timer .v{font-family:var(--font-num);font-weight:700;font-size:44px;line-height:1;font-variant-numeric:tabular-nums;transition:color .4s}
 .timer .v small{font-size:22px;color:var(--ink-2);font-weight:600;margin:0 4px 0 1px}
@@ -373,8 +373,6 @@ th.r,td.r{text-align:right;font-variant-numeric:tabular-nums}
   .rail .fill::after{right:auto;left:50%;margin-left:-7px;top:auto;bottom:-7px;margin-top:0}
   .step{flex-direction:row;text-align:left;gap:14px}
   .step .dept-m{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
-  .timer{text-align:left}
-  .ctl{justify-content:flex-start}
   .wo,.journey{padding-inline:16px}
   .now{margin-inline:12px;padding:16px}
   .flow{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
