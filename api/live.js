@@ -24,7 +24,9 @@
  *   CLICKUP_COMP_VALUE   only jobs whose Comp is this value are shown (default "SFM")
  *   APP_TZ               time zone that defines "today" (default America/New_York)
  *   ANTHROPIC_API_KEY    optional; turns descriptions into short job titles and quotes into 3 steps
- *   Sign-off sheet: the task's PDF attachment (lib/signoff.js); its signature image is served by /api/signature
+ *   CLICKUP_FIELD_SHAREPOINT  custom field holding the work order's SharePoint folder link (default "Sharepoint Link")
+ *   Sign-off sheet: the task's PDF attachment, else a PDF in the SharePoint folder (lib/signoff.js); signature at /api/signature
+ *   After photos: images starting with "A" in the SharePoint folder (lib/sharepoint.js), served by /api/photo
  *   PAYMENTS_GRAPH_* + TEAMS_PAY_CHAT_ID  optional; the technician's name from the Teams payment request (lib/teams.js)
  *   DASHBOARD_PASSWORD   required before any real data is served (see middleware.js)
  *
@@ -33,6 +35,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { TEAMS_SETTINGS, chatMessagesSince, paymentRequests } from "../lib/teams.js";
 import { readSignoff } from "../lib/signoff.js";
+import { sharepointConfigured, folderFiles, fileContent } from "../lib/sharepoint.js";
 
 const API = "https://api.clickup.com/api/v2";
 const env = (k, d = "") => (process.env[k] ?? d).trim();
@@ -244,10 +247,11 @@ async function aiTitles(items) {
   return out;
 }
 
-/* ── Sign-off sheets: the PDF attached to the task, read for the manager's name and signature ── */
+/* ── Job files: the sign-off sheet (ClickUp attachment, else the SharePoint folder) and the
+      after photos (SharePoint folder, names starting with "A") ── */
 
-const signoffCache = new Map(); // task id → { at, result }; result null = no sign-off sheet yet
-const SIGNOFF_RECHECK_MS = 3 * 60 * 1000;
+const filesCache = new Map(); // task id → { at, signoff, photos, error }
+const FILES_RECHECK_MS = 3 * 60 * 1000;
 
 /** The task's PDF attachments, sign-off sheets and work-order-named files first, newest first. */
 function signoffCandidates(task) {
@@ -263,7 +267,7 @@ async function download(url) {
   const host = new URL(url).hostname;
   const res = await fetch(url, {
     method: "GET",
-    headers: /(^|\.)clickup(-attachments)?\.com$/.test(host) ?{ Authorization: env("CLICKUP_TOKEN") } : {},
+    headers: /(^|\.)clickup(-attachments)?\.com$/.test(host) ? { Authorization: env("CLICKUP_TOKEN") } : {},
     signal: AbortSignal.timeout(20000),
   });
   if (!res.ok) throw new Error(`attachment ${res.status}`);
@@ -272,28 +276,46 @@ async function download(url) {
   return buf;
 }
 
-/**
- * { manager, signedAt, png } for a task's sign-off sheet, or null when none is attached yet.
- * Pass the task when it is at hand (with its attachments); otherwise it is read from ClickUp.
- * Cached per task; a task without a sheet is checked again after a few minutes.
- */
-export async function signoffFor(taskId, task = null) {
-  const hit = signoffCache.get(taskId);
-  if (hit && (hit.result || Date.now() - hit.at < SIGNOFF_RECHECK_MS)) return hit.result;
-  if (!task?.attachments?.length) task = await cuGet(`/task/${encodeURIComponent(taskId)}`);
-  const { spaceIds } = await resolveScope();
-  if (!spaceIds.includes(String(task.space?.id))) throw new Error("task outside the dashboard's space");
-  let result = null;
-  for (const a of signoffCandidates(task)) {
+/** The first of these PDFs that is a sign-off sheet, as { signedAt, png }. */
+async function firstSignoff(pdfs, read, when) {
+  for (const p of pdfs.slice(0, 3)) {
     try {
-      const s = readSignoff(await download(a.url));
-      if (s.isSignoff || s.png) { result = { manager: s.manager, signedAt: Number(a.date) || null, png: s.png }; break; }
+      const s = readSignoff(await read(p));
+      if (s.isSignoff || s.png) return { signedAt: when(p), png: s.png };
     } catch (err) {
       console.warn("Sign-off read failed:", String(err?.message ?? err));
     }
   }
-  signoffCache.set(taskId, { at: Date.now(), result });
-  return result;
+  return null;
+}
+
+/**
+ * { signoff: { signedAt, png } | null, photos: [{ driveId, id, name, at }], error } for a task.
+ * Pass the task when it is at hand; otherwise it is read from ClickUp. Cached per task;
+ * a task still missing its sign-off or photos is checked again after a few minutes.
+ */
+export async function jobFiles(taskId, task = null) {
+  const hit = filesCache.get(taskId);
+  if (hit && ((hit.signoff && hit.photos.length) || Date.now() - hit.at < FILES_RECHECK_MS)) return hit;
+  if (!task?.attachments) task = await cuGet(`/task/${encodeURIComponent(taskId)}`);
+  const { spaceIds } = await resolveScope();
+  if (!spaceIds.includes(String(task.space?.id))) throw new Error("task outside the dashboard's space");
+
+  let signoff = hit?.signoff ?? (await firstSignoff(signoffCandidates(task), (a) => download(a.url), (a) => Number(a.date) || null));
+  let photos = hit?.photos ?? [], error = "";
+  const link = fieldText(field(task, env("CLICKUP_FIELD_SHAREPOINT", "Sharepoint Link")));
+  if (link && sharepointConfigured() && (!signoff || !photos.length)) {
+    try {
+      const folder = await folderFiles(link);
+      photos = folder.photos.slice(0, 8);
+      if (!signoff) signoff = await firstSignoff(folder.pdfs, fileContent, (f) => f.at);
+    } catch (err) {
+      error = String(err?.message ?? err).slice(0, 200);
+    }
+  }
+  const out = { at: Date.now(), signoff, photos, error };
+  filesCache.set(taskId, out);
+  return out;
 }
 
 async function build() {
@@ -331,11 +353,13 @@ async function build() {
     }
   }
 
-  // Sign-off sheets: a few new lookups per refresh (each is a task read plus a PDF download).
-  let signoffError = "";
-  const toCheck = today.filter(([t]) => { const h = signoffCache.get(t.id); return !h || (!h.result && Date.now() - h.at >= SIGNOFF_RECHECK_MS); }).slice(0, 8);
+  // Sign-off sheets and after photos: a few new lookups per refresh (task read, folder listing, PDF download).
+  let filesError = "";
+  const toCheck = today.filter(([t]) => { const h = filesCache.get(t.id); return !h || ((!h.signoff || !h.photos.length) && Date.now() - h.at >= FILES_RECHECK_MS); }).slice(0, 8);
   for (let i = 0; i < toCheck.length; i += 4)
-    await Promise.all(toCheck.slice(i, i + 4).map(([t]) => signoffFor(t.id, t).catch((err) => { signoffError = "Sign-off sheets: " + String(err?.message ?? err).slice(0, 200); })));
+    await Promise.all(toCheck.slice(i, i + 4).map(([t]) => jobFiles(t.id, t).then((f) => { if (f.error) filesError = f.error; }).catch((err) => { filesError = "Sign-off and photos: " + String(err?.message ?? err).slice(0, 200); })));
+  const shareField = env("CLICKUP_FIELD_SHAREPOINT", "Sharepoint Link");
+  if (!sharepointConfigured() && today.some(([t]) => fieldText(field(t, shareField)))) filesError ||= "After photos come from SharePoint once the Microsoft app settings are added";
 
   // Titles and steps: cached per description + quote; new ones go to Claude in one batch.
   const descOf = (t) => safeDescription(fieldText(field(t, names.desc)) || t.text_content || t.description || "").slice(0, 6000); // titles only need the opening of long descriptions
@@ -364,7 +388,11 @@ async function build() {
         steps: ai?.steps?.length ? ai.steps : quoteSteps(quoteOf(t)),
         tech: shortName(teamsTech || fieldText(field(t, techField))),
         techFromTeams: !!teamsTech,
-        signoff: (({ result } = {}) => result && { signedAt: result.signedAt, signature: !!result.png })(signoffCache.get(t.id)),
+        ...((f) => ({
+          signoff: f?.signoff ? { signedAt: f.signoff.signedAt, signature: !!f.signoff.png } : null,
+          photos: f?.photos.length ?? 0,
+          photosAt: f?.photos.length ? Math.max(...f.photos.map((p) => p.at ?? 0)) || null : null,
+        }))(filesCache.get(t.id)),
         trade: fieldText(field(t, names.trade)),
         fm: fieldText(field(t, names.fm)),
         cost: fieldNumber(field(t, names.cost)),
@@ -381,7 +409,7 @@ async function build() {
   if (doneAny.length && !doneAny.some((t) => field(t, compField))) warnings.push(`No "${compField}" field found on today's completed tasks, so none are shown`);
   if (aiError) warnings.push(aiError);
   if (teamsError) warnings.push(teamsError);
-  if (signoffError) warnings.push(signoffError);
+  if (filesError) warnings.push(filesError);
   if (!env("ANTHROPIC_API_KEY")) warnings.push("ANTHROPIC_API_KEY is not set, so titles use the first sentence of the description");
 
   const statusesSeen = [...new Set(updated.map((t) => t.status?.status).filter(Boolean))].sort();

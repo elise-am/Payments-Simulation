@@ -175,6 +175,7 @@ svg.i{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .tile{position:relative;aspect-ratio:4/3;max-width:100%;border-radius:6px;overflow:hidden;color:#fff;display:flex;align-items:flex-end;padding:8px;font-size:12px;font-weight:600;opacity:0;transform:scale(.85);transition:opacity .3s,transform .35s cubic-bezier(.3,1.5,.5,1)}
 .tile.on{opacity:1;transform:none}
 .tile .ph{position:absolute;inset:0}
+img.ph{width:100%;height:100%;object-fit:cover;background:var(--surface-2)}
 .tile span{position:relative;text-shadow:0 1px 2px rgba(0,0,0,.6)}
 .tile .cam{position:absolute;top:8px;left:8px;width:18px;height:18px;opacity:.75}
 .tile .badge{position:absolute;top:7px;right:7px;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;transform:scale(0);transition:transform .3s cubic-bezier(.3,1.6,.5,1)}
@@ -1764,18 +1765,21 @@ function renderReal(){
     $('#wo-meta').innerHTML=`<b>${esc(j.wo)}</b> · ${esc(j.trade||'Trade not set')} · ${esc(j.fm||'FM not set')} · ${j.tech?`<b>${esc(j.tech)}</b>`:'Technician <b>from Teams</b>'}`;
     const st=$('#st-0');st.classList.add('done');st.querySelector('.when').textContent=tzTime(j.completedAt);
     if(j.signoff){const s1=$('#st-1');s1.classList.add('done');s1.querySelector('.when').textContent=j.signoff.signedAt?tzTime(j.signoff.signedAt):'';}
+    if(j.photos){const s2=$('#st-2');s2.classList.add('done');s2.querySelector('.when').textContent=j.photosAt?tzTime(j.photosAt):'';}
     $('#now').innerHTML=head('Field','Job completed on site',`${j.tech?esc(j.tech):'The technician'} finished the work at ${j.store?esc(j.store):'the site'} and checked out at ${tzTime(j.completedAt)}.`)+
       (j.steps?.length?`<ul class="checks">${j.steps.map(w=>`<li class="on"><span class="cb">${ic('check')}</span>${esc(w)}</li>`).join('')}</ul>`:'')+
       (j.signoff?`<div class="now-h next"><span class="d">Field</span><h3>Site manager sign-off</h3><p>From the sign-off sheet attached in ClickUp.</p></div>
         <div class="sig"><div class="pad"><span class="x">×</span>${j.signoff.signature?`<span class="ink" role="img" aria-label="Site manager's signature" style="--sig:url('/api/signature?id=${encodeURIComponent(j.id)}')"></span>`:''}</div>
         <div class="signed on"><b>Site manager</b>${j.signoff.signedAt?'Signed '+tzTime(j.signoff.signedAt):''}</div></div>`:'')+
+      (j.photos?`<div class="now-h next"><span class="d">Field</span><h3>After photos submitted</h3><p>From the work order's SharePoint folder.</p></div>
+        <div class="tiles">${Array.from({length:j.photos},(_,n)=>`<div class="tile on ok"><img class="ph" src="/api/photo?id=${encodeURIComponent(j.id)}&n=${n}" alt="After photo ${n+1}" loading="lazy"><b class="badge">${ic('check')}</b></div>`).join('')}</div>`:'')+
       `<div class="prior">The next steps fill in from the Teams payment messages: technician name, amount and payment method when the payment is issued, then the time the technician is paid.${j.titleFromAi?'':' Title taken from the description (AI titles are off or still loading).'}</div>`;
     realTimer();
   }
   $('#flows-h').innerHTML=`<h2>Completed today</h2><span class="meta">${fmtN(jobs.length)} work orders · select one to follow it</span>`;
   $('#flows').innerHTML=jobs.length?jobs.map((x,n)=>`<li class="flow${n===realSel?' just':''}" data-n="${n}" role="button" tabindex="0" style="cursor:pointer">
       <div class="who"><b>${esc(x.title)}</b><span>${esc(x.wo)} · ${esc(x.trade||'–')} · <span class="ty">${esc(x.fm||'–')}</span></span></div>
-      <div class="dots" aria-hidden="true">${STEPS.map((_,k)=>{const n=x.signoff?2:1;return `<i class="${k<n?'d':k===n?'a':''}"></i>`;}).join('')}</div>
+      <div class="dots" aria-hidden="true">${STEPS.map((_,k)=>{const d=[1,!!x.signoff,!!x.photos],n=d.indexOf(false)<0?3:d.indexOf(false);return `<i class="${k<3&&d[k]?'d':k===n?'a':''}"></i>`;}).join('')}</div>
       <div class="st">Completed ${tzTime(x.completedAt)}${x.cost!=null?' · '+fmt$(x.cost):''}</div></li>`).join('')
     :'<li class="empty">Nothing has reached Done/Incurred today yet.</li>';
   $('#wall-h').innerHTML='<h2>Just paid</h2><span class="meta">From Teams payment messages</span>';

@@ -1,11 +1,11 @@
 /**
  * GET /api/signature?id=<ClickUp task id> — the site manager's signature from the task's
- * sign-off sheet PDF, as a PNG whose alpha is the ink (the page tints it with the theme's ink color).
+ * sign-off sheet PDF (ClickUp attachment or SharePoint folder), as a PNG whose alpha is the ink (the page tints it with the theme's ink color).
  *
  * Read-only, behind the dashboard password (middleware.js), and limited to tasks in the
  * dashboard's ClickUp space. 404 when the task has no sign-off sheet or no signature in it.
  */
-import { signoffFor } from "./live.js";
+import { jobFiles } from "./live.js";
 
 const env = (k) => (process.env[k] ?? "").trim();
 
@@ -16,7 +16,7 @@ export async function GET(request) {
   if (!env("CLICKUP_TOKEN")) return Response.json({ ok: false, reason: "not_configured" }, { status: 503, headers });
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) return Response.json({ ok: false, reason: "bad_id" }, { status: 400, headers });
   try {
-    const s = await signoffFor(id);
+    const s = (await jobFiles(id)).signoff;
     if (!s?.png) return Response.json({ ok: false, reason: "no_signature" }, { status: 404, headers });
     return new Response(s.png, { headers: { "content-type": "image/png", "cache-control": "private, max-age=3600" } });
   } catch (err) {
