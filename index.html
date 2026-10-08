@@ -779,7 +779,7 @@ const WOS=(window.DEMO_WOS||[]).map(([wo,client,store,city,state,trade,title,wor
 const woAt=r=>WOS[Math.floor(r()*WOS.length)];
 // technician cost per job: about $590 on average, most jobs between $400 and $850
 function demoCost(r){return r5(Math.min(1600,Math.max(220,logn(r,560,.32))));}
-const METHODS=[{name:'ACH / Bank Transfer',w:55,rel:1},{name:'Credit Over the Phone',w:28,rel:.8},{name:'Checks',w:12,rel:3},{name:'Zelle & Cash App',note:'Last resort only',w:5,rel:.9}];
+const METHODS=[{name:'ACH / Bank Transfer',w:24,rel:1},{name:'Credit Over the Phone',w:74.4,rel:.8},{name:'Checks',w:1.4,rel:3},{name:'Zelle & Cash App',note:'Last resort only',w:.4,rel:.9}];
 const REASONS=[{name:'Above quoted cost',w:30},{name:'First payment to payee',w:22},{name:'Receipt missing',w:18},{name:'Alternate recipient',w:12},{name:'Possible duplicate',w:7},{name:'Rate above vendor card',w:5}];
 const FLOOR='Above quoted cost';
 const PTYPES=['Trip & diagnostic','Parts advance','Completion'];
@@ -790,23 +790,34 @@ const NTECH=900;
 function techName(id){return FIRST[id%FIRST.length]+' '+LASTI[(id*7+3)%LASTI.length]+'.';}
 function nowHours(){const d=new Date();return d.getHours()+d.getMinutes()/60;}
 function dayFrac(){let a=0,t=0;for(let h=0;h<24;h+=.25){const w=shape(h);t+=w;if(h<nowHours())a+=w;}return Math.max(.02,a/t);}
-function shape(h){if(h<6||h>=22)return .2;if(h<8)return .6;if(h<18)return 1;return .5;}
+/* Real SFM payment speed (demo-jobs.js, from Payments Stats): per week, the share of requests with a 👍 and
+   41 quantiles of minutes from the request posted to the 👍. Speeds are drawn from these, so medians,
+   averages and slow tails match the real ones week by week. */
+const SPEED=window.DEMO_SPEED||null;
+function realProcH(r,day){
+  if(!SPEED)return logn(r,.12,.8);
+  const q=SPEED.weeks[Math.max(0,Math.min(SPEED.weeks.length-1,Math.floor(day/7)))][1],u=r()*(q.length-1),i=Math.floor(u);
+  return (q[i]+(q[Math.min(q.length-1,i+1)]-q[i])*(u-i))/60;
+}
+// when requests are posted (real SFM hour-of-day pattern), weekdays and weekends
+const HOURS_WD=SPEED?SPEED.hourWD.map(v=>v/Math.max(...SPEED.hourWD)):null,HOURS_WE=SPEED?SPEED.hourWE.map(v=>v/Math.max(...SPEED.hourWE)):null;
+function shape(h,weekend){const H=weekend?HOURS_WE:HOURS_WD;if(H)return Math.max(.004,H[Math.floor(h)%24]);if(h<6||h>=22)return .2;if(h<8)return .6;if(h<18)return 1;return .5;}
 
 /* 180 days of history ending Oct 6, 2026 (day 179). Time is in hours from day 0. */
 const NDAY=180, NOW=NDAY*24;
 function dDate(d){return new Date(2026,9,6-(NDAY-1)+d);}
 
-function payTiming(r,trend,type,lowMargin){
+function payTiming(r,trend,type,lowMargin,day){
   const raise=(type==='Completion'?logn(r,.38,.6):logn(r,.24,.5))*Math.sqrt(trend);
   const verify=.05+r()*.02;
   let flagged=r()<(type==='Completion'?.115:.07);const reasons=[];
   if(lowMargin&&r()<.7){flagged=true;reasons.push(FLOOR);}
   if(flagged&&!reasons.length){reasons.push(wpick(r,REASONS).name);if(r()<.2){const b=wpick(r,REASONS).name;if(b!==reasons[0])reasons.push(b);}}
-  const review=flagged?logn(r,.08,.25)*trend:0;
+  const proc=realProcH(r,day),verifyH=Math.min(verify,proc*.2),review=flagged?Math.max(0,Math.min(proc-verifyH,logn(r,.08,.25)*trend)):0;
   let outcome='approved';
   if(flagged){const x=r(),fl=reasons[0]===FLOOR;if(x<(fl?.02:.06))outcome='rejected';else if(x<(fl?.5:.19))outcome='adjusted';}
-  const M=wpick(r,METHODS),release=logn(r,.11,.2)*trend*M.rel;
-  return {raise,verify,flagged,reasons,review,outcome,release,method:M.name,reviewer:pick(r,REVIEWERS)};
+  const M=wpick(r,METHODS),release=Math.max(0,proc-verifyH-review);
+  return {raise,verify:verifyH,flagged,reasons,review,outcome,release,method:M.name,reviewer:pick(r,REVIEWERS)};
 }
 
 function makeWO(r,d,tClose,trend,seq,pays){
@@ -814,7 +825,8 @@ function makeWO(r,d,tClose,trend,seq,pays){
   const T=src?(TRADES.find(t=>t.name===src.trade)||{name:src.trade,mg:.33}):wpick(r,TRADES),C=wpick(r,CLIENTS),ci=Math.floor(r()*CITIES.length);
   const mq=Math.min(.58,Math.max(.06,T.mg+gauss(r)*.055));
   const quoted=demoCost(r),billed=r5(quoted/(1-mq));
-  const x=r(),types=x<.12?['Completion']:x<.80?(r()<.6?['Trip & diagnostic','Completion']:['Parts advance','Completion']):PTYPES.slice();
+  // payments per job in fixed shares (9.2% one, 71.9% two, 18.9% three), tuned so 30 days show 8,798 payments for 4,379 jobs
+  const x=(seq*.6180339887)%1,types=x<.092?['Completion']:x<.811?(r()<.6?['Trip & diagnostic','Completion']:['Parts advance','Completion']):PTYPES.slice();
   const techId=Math.floor(r()*NTECH);
   const w=src?{id:src.wo,day:d,tClose,trade:T.name,client:src.client,terms:C.terms,city:src.city+', '+src.state,state:src.state,
       site:src.store,techId,tech:src.tech||techName(techId),billed,quoted,pays:[]}
@@ -825,7 +837,7 @@ function makeWO(r,d,tClose,trend,seq,pays){
   const trig=[];trig[types.length-1]=tClose;
   for(let j=types.length-2;j>=0;j--)trig[j]=trig[j+1]-(types[j]==='Parts advance'?6+r()*40:20+r()*70);
   types.forEach((tp,j)=>{
-    const p=payTiming(r,trend,tp,mq<.22&&tp==='Completion');
+    const p=payTiming(r,trend,tp,mq<.22&&tp==='Completion',Math.floor(trig[j]/24));
     p.type=tp;p.idx=j+1;p.of=types.length;p.amount=amts[j];
     p.paidAmount=p.outcome==='rejected'?0:p.outcome==='adjusted'?Math.max(40,r5(amts[j]*(.72+r()*.18))):amts[j];
     p.tTrigger=trig[j];p.day=Math.floor(trig[j]/24);
@@ -841,13 +853,17 @@ function makeWO(r,d,tClose,trend,seq,pays){
   return w;
 }
 
+/* 4,379 work orders and 8,798 payments in the last 30 days, ~190 work orders on a weekday, ~30 on a Saturday,
+   ~19 on a Sunday (the real SFM weekly shape). Daily counts carry their remainders, so 30 days sum exactly. */
+const DAY_W=d=>{const dow=dDate(d).getDay();return dow===6?.159:dow===0?.098:1;};
+const WO_WEEKDAY=(()=>{let w=0;for(let d=NDAY-30;d<NDAY;d++)w+=DAY_W(d);return 4379/w;})();
 const DATA=(function(){
-  const r=mulberry32(90210),wos=[],pays=[];let seq=30001;
+  const r=mulberry32(90210),wos=[],pays=[];let seq=30001,carry=0;
   for(let d=0;d<NDAY;d++){
-    const dow=dDate(d).getDay(),wk=(dow===0||dow===6)?.45:1;
-    const growth=.9+.15*(d/(NDAY-1)),trend=1.1-.2*(d/(NDAY-1));
-    const n=Math.round(165*growth*wk*(.9+r()*.2)),day=[]; // about 168 work orders on a weekday
-    for(let i=0;i<n;i++){let h;do{h=r()*24;}while(r()>shape(h));day.push(d*24+h);}
+    const dow=dDate(d).getDay(),we=dow===0||dow===6;
+    const trend=1.1-.2*(d/(NDAY-1));
+    carry+=WO_WEEKDAY*DAY_W(d);const n=Math.floor(carry+1e-9),day=[];carry-=n;
+    for(let i=0;i<n;i++){let h;do{h=r()*24;}while(r()>shape(h,we));day.push(d*24+h);}
     day.sort((a,b)=>a-b).forEach(t=>wos.push(makeWO(r,d,t,trend,seq++,pays)));
   }
   return {wos,pays};
@@ -883,20 +899,29 @@ const STEPS=[
   {key:'paid',   dept:4,label:'Technician paid',        icon:'user',   dur:5600},
 ];
 const JOBS=[
-  {trade:'HVAC',title:'Rooftop unit not cooling',billed:660,work:['Failed contactor replaced','Supply air back down to 41°F','Filters replaced on both units'],photos:['Condenser','New contactor','Filters','Supply temp']},
-  {trade:'Refrigeration',title:'Walk-in cooler holding at 48°F',billed:790,work:['Evaporator fan motor replaced','Box holding steady at 36°F','Door gasket adjusted'],photos:['Evaporator','Fan motor','Thermometer','Door gasket']},
-  {trade:'Plumbing',title:'Leak under the prep sink',billed:560,work:['Drain line resealed','Pressure tested with no leaks','Area cleaned and dried'],photos:['Drain line','P-trap','Cabinet floor','Sink']},
-  {trade:'Electrical',title:'Back hallway lights and exit sign out',billed:600,work:['Two fixtures replaced','Exit sign battery tested','Breaker labeled in panel'],photos:['Fixtures','Exit sign','Panel','Hallway']},
-  {trade:'Handyman',title:'Front entry door closer broken',billed:380,work:['Door closer replaced','Swing speed adjusted','Latch tested ten times'],photos:['Closer','Hinge','Latch','Entry']},
+  {trade:'HVAC',title:'Rooftop unit not cooling',billed:660,work:['Failed contactor replaced','Supply air back down to 41°F','Filters replaced on both units']},
+  {trade:'Refrigeration',title:'Walk-in cooler holding at 48°F',billed:790,work:['Evaporator fan motor replaced','Box holding steady at 36°F','Door gasket adjusted']},
+  {trade:'Plumbing',title:'Leak under the prep sink',billed:560,work:['Drain line resealed','Pressure tested with no leaks','Area cleaned and dried']},
+  {trade:'Electrical',title:'Back hallway lights and exit sign out',billed:600,work:['Two fixtures replaced','Exit sign battery tested','Breaker labeled in panel']},
+  {trade:'Handyman',title:'Front entry door closer broken',billed:380,work:['Door closer replaced','Swing speed adjusted','Latch tested ten times']},
 ];
-const PHOTO_SETS={HVAC:['Unit','Repair','Readings','Area'],Refrigeration:['Unit','Repair','Temperature','Area'],Plumbing:['Before','Repair','Fixture','Area'],
-  Electrical:['Panel','Repair','Fixture','Area'],Appliance:['Unit','Repair','Test','Area'],Handyman:['Before','Repair','Finished','Area'],Locksmith:['Door','Lock','Keys','Entry']};
-const PHOTOS_OF=t=>PHOTO_SETS[t]||['Before','Repair','Finished','Area'];
 const PATTERNS=[['Trip & diagnostic','Completion'],['Completion'],PTYPES,['Parts advance','Completion']];
 const SIGNERS=[['J. Alvarez','Store Manager'],['K. Thompson','Facility Manager'],['R. Patel','General Manager'],['S. Nguyen','Shift Lead']];
 const OPS=['Priya S.','Luis M.','Tasha B.'];
 const APS=['Dana K.','Mark O.'];
-const PHOTO_BG=['linear-gradient(135deg,#46535e,#1f2a33 70%)','linear-gradient(160deg,#6b5b47,#2b241c 75%)','linear-gradient(135deg,#3f5a52,#17261f 70%)','linear-gradient(150deg,#5a5f6e,#22252e 70%)'];
+// real after-photos from SFM jobs, tagged by trade so a job only shows photos of its own kind of work;
+// the Wendy's ones are only shown on Wendy's work orders
+const PICS=[['curb-stops','Parking stops',['Handyman','Overhead Door']],['grate','Drain grate',['Plumbing','Handyman']],
+  ['ceiling-diffuser','Ceiling diffuser',['HVAC']],['studio','Supply vents',['HVAC','Electrical']],
+  ['floor-drain','Floor drain',['Plumbing','Refrigeration','Janitorial']],['beverage-lines','Beverage lines',['Refrigeration','Plumbing','Appliance']],
+  ['restroom-partitions','Partitions',['Handyman','Locksmith','Janitorial']],['water-heater','Water heater',['Plumbing','Electrical','Appliance']]];
+const WENDYS_PICS=[['wendys-sign','Exterior'],['wendys-storefront','Storefront']];
+function pickPics(trade,store){const r=mulberry32(5003+jCount*7919);
+  let pool=PICS.filter(p=>p[2].includes(trade));
+  if(pool.length<2)pool=pool.concat(PICS.filter(p=>p[2].includes('Handyman')&&!pool.includes(p)));
+  for(let i=pool.length-1;i>0;i--){const k=Math.floor(r()*(i+1));[pool[i],pool[k]]=[pool[k],pool[i]];}
+  const lead=/wendy/i.test(store||'')?WENDYS_PICS:[];return lead.concat(pool).slice(0,4);}
+const picURL=f=>'photos/'+f+'.jpg';
 const SIG='M4 58 C 16 18, 34 12, 30 52 S 40 70, 52 40 S 66 18, 70 46 S 80 66, 92 38 C 100 22, 112 26, 106 50 S 122 64, 134 36 S 150 30, 156 48 S 170 58, 186 34 C 194 24, 204 30, 200 46 M 120 70 C 150 62, 190 60, 236 62';
 
 const R=mulberry32(77031);
@@ -904,7 +929,9 @@ let J=null,jCount=0,elapsed=0,paused=false,cur=-1,fired=new Set(),finished=false
 
 function newJourney(){
   const w=WOS.length?woAt(R):null;
-  const job=w?{trade:w.trade,title:w.title,work:w.work,photos:PHOTOS_OF(w.trade)}:JOBS[jCount%JOBS.length];
+  const base=w?{trade:w.trade,title:w.title,work:w.work}:JOBS[jCount%JOBS.length];
+  const pics=pickPics(base.trade,w?.store);
+  const job={...base,pics:pics.map(p=>p[0]),photos:pics.map(p=>p[1])};
   const tech=w?.tech||FIRST[(jCount*7+3)%FIRST.length]+' '+LASTI[(jCount*5+11)%LASTI.length]+'.';
   const first=tech.split(' ')[0];
   const hiccup=jCount%3===1;
@@ -917,7 +944,7 @@ function newJourney(){
   // realistic minutes after the previous step: sign-off, photos, ops review (longer when a retake is needed),
   // payment triggered, issued (the 👍 in the payments chat), bank confirmed, money in the technician's hands
   const span=(a,b)=>a+R()*(b-a);
-  const mins=[0,span(3,12),span(6,20),span(18,55)+(hiccup?span(20,40):0),span(3,12),span(20,95),span(10,45),span(1,6)];
+  const mins=[0,span(3,12),span(6,20),span(18,55)+(hiccup?span(20,40):0),span(3,12),Math.min(180,Math.max(1,realProcH(R,NDAY-1)*60)),span(10,45),span(1,6)];
   const cum=[];mins.reduce((a,b,i)=>(cum[i]=a+b),0);
   const durs=STEPS.map(s=>s.dur+(s.key==='review'&&hiccup?3800:0));
   const starts=[];durs.reduce((a,b,i)=>(starts[i]=a,a+b),0);
@@ -926,7 +953,7 @@ function newJourney(){
     signer:SIGNERS[jCount%SIGNERS.length],ops:OPS[jCount%OPS.length],ap:APS[jCount%APS.length],
     start:nowHours()-cum[7]/60,ref:'PAY-'+(180700+jCount*13)};
   jCount++;elapsed=0;cur=-1;fired=new Set();finished=false;holdLeft=0;
-  if(jCount>1)jobClosed();
+
 
   $('#wo-title').textContent=job.title;
   $('#wo-meta').innerHTML=`<b>${esc(J.wo)}</b> · ${esc(job.trade)} · ${esc(client.name)} · ${esc(J.site)}, ${esc(J.city)} · Technician <b>${esc(tech)}</b>`;
@@ -953,7 +980,7 @@ function buildJourney(){
 }
 
 function head(dept,title,sub){return `<div class="now-h"><span class="d">${dept}</span><h3>${title}</h3>${sub?`<p>${sub}</p>`:''}</div>`;}
-function tilesHTML(){return `<div class="tiles">${J.job.photos.map((p,i)=>`<div class="tile" id="tile-${i}"><div class="ph" style="background:${PHOTO_BG[i]}"></div><svg class="i cam"><use href="#i-camera"/></svg><span>${p}</span><b class="badge">${ic('check')}</b></div>`).join('')}</div>`;}
+function tilesHTML(){return `<div class="tiles">${J.job.photos.map((p,i)=>`<div class="tile" id="tile-${i}"><img class="ph" src="${picURL(J.job.pics[i])}" alt=""><svg class="i cam"><use href="#i-camera"/></svg><span>${p}</span><b class="badge">${ic('check')}</b></div>`).join('')}</div>`;}
 function on(sel){const n=$(sel);if(n)n.classList.add('on');}
 function priorHTML(){
   if(!J.earlier.length)return `<div class="prior">Single payment job. The full technician cost is released at completion.</div>`;
@@ -1027,8 +1054,8 @@ function typing(v){$('#typing').classList.toggle('on',v);}
 function msg(kind,text){
   const box=$('#msgs'),d=document.createElement('div');
   if(kind==='in'||kind==='out'){d.className='m enter '+kind;d.textContent=text;}
-  if(kind==='pics'||kind==='pics1'){d.className='m out pics enter';const n=kind==='pics'?4:1;
-    d.innerHTML=Array.from({length:n},(_,i)=>`<div style="background:${PHOTO_BG[kind==='pics'?i:1]}"></div>`).join('');}
+  if(kind==='pics'||kind==='pics1'){d.className='m out pics enter';const n=kind==='pics'?J.job.pics.length:1;
+    d.innerHTML=Array.from({length:n},(_,i)=>`<div style="background:#333 url(${picURL(J.job.pics[kind==='pics'?i:1])}) center/cover"></div>`).join('');}
   if(kind==='dep'){const n=J.types.length;d.className='m dep enter';d.innerHTML=`<div class="k">Deposit received</div><div class="a">${usd2.format(J.amount)}</div><div class="f">From Seamless FM · ${J.wo} · Payment ${n} of ${n} · ACH / Bank Transfer</div>`;}
   box.insertBefore(d,$('#typing'));
   const all=box.querySelectorAll('.m');if(all.length>7)all[0].remove();
@@ -1092,30 +1119,57 @@ function finish(){
   recordToday({type:'Completion'});
 }
 
-/* today so far: seeded from the average recent weekday, scaled to the time of day */
-const TODAY=(function(){
-  const recent=DATA.wos.filter(w=>w.day>=NDAY-28&&dDate(w.day).getDay()%6!==0);
-  const days=new Set(recent.map(w=>w.day)).size||1,frac=dayFrac();
-  const wos=recent.length/days*frac,billed=sum(recent,w=>w.billed)/days*frac,cost=sum(recent,w=>w.cost)/days*frac;
-  const rp=DATA.pays.filter(p=>p.day>=NDAY-28&&p.tPaid!=null&&dDate(p.day).getDay()%6!==0);
-  const W=Math.round(wos);return {wos:W,jobsPaid:Math.max(0,W-6),pays:Math.round(rp.length/days*frac),review:9};
-})();
+/* Demo: a simulated day of SFM jobs in the same shape as /api/payspeed. The day's schedule is
+   fixed per date (same on every refresh): about 160 work orders close between 1 AM and 11 PM,
+   a few minutes apart, busiest in business hours. Each render shows only what has happened by
+   now, so jobs move from completed to requested to paid as the clock runs, and a few run late. */
+const DEMO_JOBS=[...JOBS.map(j=>[j.trade,j.title,j.billed]),['HVAC','Thermostat not responding',420],['Plumbing','Toilet running nonstop',310],
+  ['Electrical','Outlet sparking in break room',360],['Handyman','Ceiling tile water stain',260],['Refrigeration','Ice machine not making ice',540],
+  ['Plumbing','Water heater pilot out',480],['HVAC','Noisy blower motor',590],['Roofing','Roof leak over the stockroom',900],['Locksmith','Back door lock jammed',260],['Electrical','Parking lot pole light out',720]];
+let demoDay=null;
+const DEMO_STATES=[...new Set(CITIES.map(c=>c.slice(-2)))];
+// how busy each hour is (work orders closing), from 1 AM to 11 PM
+function demoPace(h){return h<6?.25:h<8?.7:h<12?1.2:h<13?.95:h<17?1.15:h<19?.7:h<21?.45:.3;}
+function demoSchedule(){
+  const d=new Date(),key=d.toDateString();if(demoDay?.key===key)return demoDay;
+  const mid=new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime(),M=60000,FROM=60,TO=23*60;
+  const R=mulberry32(d.getFullYear()*1000+d.getMonth()*40+d.getDate());
+  const wait=(fast,mid_,slow)=>{const x=R();return (x<.72?fast[0]+R()*(fast[1]-fast[0]):x<.94?mid_[0]+R()*(mid_[1]-mid_[0]):slow[0]+R()*(slow[1]-slow[0]))*M;};
+  // cumulative pace minute by minute, so closings can be spread evenly along it with a little jitter
+  const cum=[0];for(let m=FROM;m<TO;m++)cum.push(cum[cum.length-1]+demoPace(m/60));
+  const total=cum[cum.length-1],N=Math.round(156+R()*9),jobs=[];let k=0;
+  for(let n=0;n<N;n++){
+    const target=(n+.15+R()*.7)/N*total;while(cum[k+1]<target)k++;
+    const t=mid+(FROM+k+(target-cum[k])/(cum[k+1]-cum[k]))*M;
+    const w=WOS.length?woAt(R):null,[trade,title]=w?[w.trade,w.title]:DEMO_JOBS[Math.floor(R()*DEMO_JOBS.length)];
+    const req=t+wait([3,18],[18,55],[60,140]),paid=req+realProcH(R,NDAY-1)*60*M,x=R(); // request → 👍: real SFM speed
+    jobs.push({wo:w?w.wo:'WO-'+(71240+n*17),title,trade,state:w?w.state:DEMO_STATES[Math.floor(R()*DEMO_STATES.length)],tech:w?.tech||FIRST[Math.floor(R()*FIRST.length)]+' '+LASTI[Math.floor(R()*LASTI.length)]+'.',
+      amount:demoCost(R),completedAt:t,req,paid,npay:x<.12?1:x<.8?2:3});
+  }
+  return demoDay={key,since:mid,jobs};
+}
+
+/* today so far: read off the day's fixed schedule, so a refresh shows the same numbers */
+const TODAY={wos:0,jobsPaid:0,pays:0,total:0,review:9};
+function syncToday(){
+  const now=Date.now(),{jobs}=demoSchedule(),was={...TODAY};
+  const done=jobs.filter(j=>j.completedAt<=now),paid=done.filter(j=>j.paid<=now);
+  Object.assign(TODAY,{wos:done.length,jobsPaid:paid.length,pays:sum(done,j=>j.npay-1)+paid.length,total:jobs.length});
+  return [TODAY.wos!==was.wos&&0,(TODAY.wos!==was.wos||TODAY.jobsPaid!==was.jobsPaid)&&1,TODAY.pays!==was.pays&&2].filter(n=>n!==false);
+}
+syncToday();
+setInterval(()=>{const b=syncToday();if(b.length)renderToday(b);},10000);
 function renderToday(bump){
   const t=TODAY,share=t.jobsPaid/Math.max(1,t.wos);
-  const k=[['Work orders closed',fmtN(t.wos),'≈ '+fmtN(t.wos/Math.max(.05,dayFrac()))+' by end of day',''],
+  const k=[['Work orders closed',fmtN(t.wos),'',''],
     ['Jobs with technician paid',(share*100).toFixed(1)+'<small>%</small>',`${fmtN(t.jobsPaid)} of ${fmtN(t.wos)} jobs closed today`,'hero'],
     ['Payments released',fmtN(t.pays),(t.pays/Math.max(1,t.wos)).toFixed(1)+' per work order closed',''],
     ['In review now',String(t.review),'Held before release','']];
   $('#today').innerHTML=k.map(([l,v,s,c],n)=>`<div class="kpi ${c}"><span class="lbl">${l}</span><span class="val num${bump&&bump.includes(n)?' bump':''}">${v}</span><span class="sub">${s}</span></div>`).join('');
 }
-/* a job closed on site: counts toward "closed", not yet toward "technician paid" */
-function jobClosed(){TODAY.wos++;renderToday([0,1]);}
-/* a payment landed; a completion payment means that job's technician is fully paid */
-function recordToday(p){
-  TODAY.pays++;const b=[2];
-  if(p.type==='Completion'){TODAY.jobsPaid=Math.min(TODAY.wos,TODAY.jobsPaid+1);b.push(1);}
-  if(Math.random()<.3){TODAY.review=Math.max(4,Math.min(16,TODAY.review+(Math.random()<.5?-1:1)));b.push(3);}
-  renderToday(b);
+/* a payment landed in the animation: the counts follow the day's schedule, only the review queue moves here */
+function recordToday(){
+  if(Math.random()<.3){TODAY.review=Math.max(4,Math.min(16,TODAY.review+(Math.random()<.5?-1:1)));renderToday([3]);}
 }
 /* today's date in the header, with a clock that ticks each minute */
 function tickDate(){const d=new Date();
@@ -1153,7 +1207,7 @@ function tickFlows(dt){
   flowAcc+=dt;if(flowAcc<1400)return;flowAcc=0;
   const n=Math.floor(FR()*flows.length),f=flows[n];
   f.step++;
-  if(f.step>=8){f.step=7;addPaid(f,true);recordToday(f);flows[n]=newFlow(0,1);if(flows[n].type==='Completion')jobClosed();}
+  if(f.step>=8){f.step=7;addPaid(f,true);recordToday(f);flows[n]=newFlow(0,1);}
   renderFlows(n);
 }
 
@@ -1211,29 +1265,6 @@ function psData(scoped){
   return {...D,rows,summary:psSummary(rows,D.since,D.asOf),filtered:true};
 }
 
-/* Demo: a simulated day of SFM jobs in the same shape as /api/payspeed. The day's schedule is
-   fixed per date; each render shows only what has happened by now, so jobs move from
-   completed to requested to paid as the clock runs, and a few run late. */
-const DEMO_JOBS=[...JOBS.map(j=>[j.trade,j.title,j.billed]),['HVAC','Thermostat not responding',420],['Plumbing','Toilet running nonstop',310],
-  ['Electrical','Outlet sparking in break room',360],['Handyman','Ceiling tile water stain',260],['Refrigeration','Ice machine not making ice',540],
-  ['Plumbing','Water heater pilot out',480],['HVAC','Noisy blower motor',590],['Roofing','Roof leak over the stockroom',900],['Locksmith','Back door lock jammed',260],['Electrical','Parking lot pole light out',720]];
-let demoDay=null;
-const DEMO_STATES=[...new Set(CITIES.map(c=>c.slice(-2)))];
-function demoSchedule(){
-  const d=new Date(),key=d.toDateString();if(demoDay?.key===key)return demoDay;
-  const mid=new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime(),H=3600000,M=60000;
-  const R=mulberry32(d.getFullYear()*1000+d.getMonth()*40+d.getDate()),start=Math.max(mid,Math.min(mid+6*H,Date.now()-5*H)),end=start+13*H;
-  const wait=(fast,mid_,slow)=>{const x=R();return (x<.72?fast[0]+R()*(fast[1]-fast[0]):x<.94?mid_[0]+R()*(mid_[1]-mid_[0]):slow[0]+R()*(slow[1]-slow[0]))*M;};
-  const jobs=[];let t=start+R()*20*M,n=0;
-  while(t<end){
-    const w=WOS.length?woAt(R):null,[trade,title]=w?[w.trade,w.title]:DEMO_JOBS[Math.floor(R()*DEMO_JOBS.length)];
-    const req=t+wait([3,18],[18,55],[60,140]),paid=req+wait([2,22],[22,65],[65,170]);
-    jobs.push({wo:w?w.wo:'WO-'+(71240+n*17),title,trade,state:w?w.state:DEMO_STATES[Math.floor(R()*DEMO_STATES.length)],tech:w?.tech||FIRST[Math.floor(R()*FIRST.length)]+' '+LASTI[Math.floor(R()*LASTI.length)]+'.',
-      amount:demoCost(R),completedAt:t,req,paid});
-    t+=(2.5+R()*4.5)*M;n++; // about 168 work orders over the working day
-  }
-  return demoDay={key,since:mid,jobs};
-}
 function psStats(ms){
   const v=ms.filter(x=>Number.isFinite(x)&&x>=0).sort((a,b)=>a-b),q=p=>v.length?v[Math.min(v.length-1,Math.floor(p*v.length))]:null,mid=v.length>>1;
   return {n:v.length,median:!v.length?null:v.length%2?v[mid]:(v[mid-1]+v[mid])/2,p90:q(.9),within1h:v.length?v.filter(x=>x<=3600000).length/v.length:null};
