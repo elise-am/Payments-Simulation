@@ -1137,7 +1137,7 @@ function demoSchedule(){
   const wait=(fast,mid_,slow)=>{const x=R();return (x<.72?fast[0]+R()*(fast[1]-fast[0]):x<.94?mid_[0]+R()*(mid_[1]-mid_[0]):slow[0]+R()*(slow[1]-slow[0]))*M;};
   // cumulative pace minute by minute, so closings can be spread evenly along it with a little jitter
   const cum=[0];for(let m=FROM;m<TO;m++)cum.push(cum[cum.length-1]+demoPace(m/60));
-  const total=cum[cum.length-1],N=Math.round(156+R()*9),jobs=[];let k=0;
+  const total=cum[cum.length-1],N=Math.round(WO_WEEKDAY*(d.getDay()===6?.159:d.getDay()===0?.098:1)*(.97+R()*.06)),jobs=[];let k=0;
   for(let n=0;n<N;n++){
     const target=(n+.15+R()*.7)/N*total;while(cum[k+1]<target)k++;
     const t=mid+(FROM+k+(target-cum[k])/(cum[k+1]-cum[k]))*M;
