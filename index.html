@@ -1146,14 +1146,14 @@ function tickFlows(dt){
 let last=performance.now();
 function frame(now){
   const dt=Math.min(100,now-last);last=now;
-  if(MODE!=='real'&&!paused&&!document.hidden&&!$('#view-live').hidden){update(dt);tickFlows(dt);}
+  if(!paused&&!document.hidden&&!$('#view-live').hidden){update(dt);tickFlows(dt);}
   drawConfetti();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
 $('#pause').addEventListener('click',()=>{paused=!paused;$('#pause').textContent=paused?'Resume':'Pause';$('#story').classList.toggle('is-paused',paused);});
-$('#next').addEventListener('click',()=>{if(MODE==='real'){if(REAL?.jobs.length)pickReal((realSel+1)%REAL.jobs.length);return;}parts=[];newJourney();if(paused){paused=false;$('#pause').textContent='Pause';$('#story').classList.remove('is-paused');}});
+$('#next').addEventListener('click',()=>{parts=[];newJourney();if(paused){paused=false;$('#pause').textContent='Pause';$('#story').classList.remove('is-paused');}});
 
 /* ══════════════════ ANALYTICS: today's real pay speed ══════════════════
    /api/payspeed joins today's SFM ClickUp completions to the SFM $$Pay$$ Teams chat:
@@ -1619,21 +1619,10 @@ try{$('#signout').hidden=!/(^|; )sfm_auth=1(;|$)/.test(document.cookie);}catch{}
 
 /* ── tabs ── */
 let view='live';
-/* Analytics follows the same Real data / Demo choice as Live. */
 function renderView(){
   if(view!=='analytics')return;
-  const demo=MODE!=='real';
-  $('#an-bar').innerHTML=`<span class="gl">${demo?'Demo · simulated payments':'Real data · today'}</span>
-    <div class="seg" role="group" aria-label="Data"><button type="button" data-m="real" aria-pressed="${!demo}">Real data</button><button type="button" data-m="demo" aria-pressed="${demo}">Demo</button></div>`;
-  tradeOpts();
-  ['#fg-period','#fg-region','#fg-state'].forEach(id=>$(id).hidden=!demo); // real data has no location or history yet
-  if(!demo&&(F.region||F.state)){F.region=F.state='';$('#f-region').value='';stateOpts();CTX=null;}
-  if(!demo&&!PS&&!psErr&&!psBusy)loadPS(false);else renderPS();
-  $('#hist-real').hidden=demo;$('#hist-demo').hidden=!demo;
-  if(demo)renderSpeedHistory();
-  else{const D=psData(true);$('#f-note').innerHTML=D?`<b>${fmtN(D.rows.length)}</b> of ${fmtN(PS.rows.length)} jobs today`:'';}
+  tradeOpts();renderPS();renderSpeedHistory();
 }
-$('#an-bar').addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b)return;const v=b.dataset.m==='real'?'real':'demo';if(v!==MODE)setMode(v);});
 
 function setFilter(k,v){F[k]=v;CTX=null;renderView();}
 $('#f-period').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('#f-period button').forEach(x=>x.setAttribute('aria-pressed',x===b));setFilter('P',+b.dataset.p);});
@@ -1651,157 +1640,14 @@ function select(which){
 }
 VIEWS.forEach(v=>$('#tab-'+v).addEventListener('click',()=>select(v)));
 document.querySelector('.tabs').addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;const i=VIEWS.indexOf(view),n=VIEWS[(i+(e.key==='ArrowRight'?1:VIEWS.length-1))%VIEWS.length];select(n);$('#tab-'+n).focus();});
-let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(view!=='analytics')return;const D=psData(true);if(D)psGantt($('#ps-gantt'),D.rows,D.asOf,D.since);if(MODE!=='real')renderSpeedHistory();},120);});
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(view!=='analytics')return;const D=psData(true);if(D)psGantt($('#ps-gantt'),D.rows,D.asOf,D.since);renderSpeedHistory();},120);});
 
-/* ══════════════════ REAL DATA: ClickUp jobs on the Live page ══════════════════
-   /api/live returns today's work orders that reached Done/Incurred. The page reads it
-   on load, every minute after that, and whenever Refresh is pressed. Payment steps
-   stay empty until the Teams payment messages are connected. */
-let MODE='real',REAL=null,realSel=0,realNextAt=0,realBusy=false,realErr='',simWall=$('#wall').innerHTML;
-try{if(localStorage.getItem('liveSource')==='demo')MODE='demo';}catch{}
-const REFRESH_MS=60000;
-const tzTime=ms=>new Date(ms).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); // viewer's local time, same as the header clock
-async function loadReal(force){
-  if(realBusy)return;realBusy=true;setSrc();
-  try{
-    const r=await fetch('/api/live'+(force?'?refresh=1':''),{cache:'no-store'});
-    const j=await r.json().catch(()=>null);
-    if(j?.reason==='signed_out'){location.href='/login?next='+encodeURIComponent(location.pathname+location.search);return;}
-    if(j&&j.ok){
-      const keep=REAL?.jobs[realSel]?.id;REAL=j;
-      const i=keep?j.jobs.findIndex(x=>x.id===keep):-1;realSel=i>=0?i:0;
-      realErr=j.stale?'ClickUp did not answer, showing the last good read':'';
-      if(MODE==='real')renderReal();
-    }else{
-      realErr=!j?'ClickUp unreachable':j.reason==='not_configured'?'ClickUp not connected yet':j.reason==='locked'?'Real data is locked until a dashboard password is set':'ClickUp error: '+(j.message||'');
-    }
-  }catch(e){console.error('Live data:',e);realErr=REAL?'Could not show the ClickUp data':'ClickUp unreachable';}
-  realBusy=false;realNextAt=Date.now()+REFRESH_MS;setSrc();if(!REAL)renderUnavailable();
-}
-/* Real data shows today's ClickUp work orders; Demo plays the simulated story with modeled numbers. */
-function setMode(m){
-  MODE=m;try{localStorage.setItem('liveSource',m);}catch{}
-  if(m==='real'){if(REAL)renderReal();else renderUnavailable();}
-  else{
-    $('#pause').hidden=false;$('#next').disabled=false;
-    $('#flows-h').innerHTML='<h2>Also on the way</h2><span class="meta">Other payments moving through the same steps</span>';
-    $('#wall-h').innerHTML='<h2>Just paid</h2><span class="meta">Newest first</span>';
-    $('#wall').innerHTML=simWall;
-    $('#notice').hidden=true;renderGoalbar();
-    renderFlows(-1);renderToday();parts=[];newJourney();
-  }
-  setSrc();renderView();
-}
-function setSrc(){
-  const el=$('#src');if(!el)return;
-  if(view==='analytics'){el.innerHTML='<span class="sim-chip" title="Modeled data for demonstration">Simulated data</span>';return;}
-  if(MODE!=='real'){el.innerHTML='<span class="sim-chip" title="Modeled data for demonstration">Simulated data</span>';return;}
-  const secs=Math.max(0,Math.ceil((realNextAt-Date.now())/1000));
-  const status=realBusy?'Refreshing…':REAL?`Updated ${tzTime(REAL.asOf)} · next in ${secs}s`:(realErr?'':'Connecting to ClickUp…');
-  el.innerHTML=`<span class="upd">${status}${realErr?`${status?' · ':''}<b class="mg lo">${esc(realErr)}</b>`:''}</span>
-    <button type="button" class="btn" id="refresh"${realBusy?' disabled':''}>Refresh</button>`;
-}
-$('#src').addEventListener('click',e=>{if(e.target.closest('#refresh'))loadReal(true);});
-/* Before the first ClickUp answer, or when ClickUp can't be reached and nothing was loaded yet. */
-function renderUnavailable(){
-  if(REAL||MODE!=='real')return;
-  const loading=!realErr;
-  $('#pause').hidden=true;$('#next').disabled=true;renderGoalbar();$('#notice').hidden=true;
-  $('#today').innerHTML=['Work orders completed','Jobs with technician paid','Payments released','Average technician cost']
-    .map(l=>`<div class="kpi"><span class="lbl">${l}</span><span class="val num">–</span><span class="sub"></span></div>`).join('');
-  $('#wo-title').textContent=loading?'Loading today’s work orders…':'Couldn’t load today’s work orders';
-  $('#wo-meta').textContent=loading?'Reading ClickUp':realErr+'. Trying again every minute, or press Refresh.';
-  buildJourney();document.querySelectorAll('.band').forEach(b=>b.classList.remove('on','ok'));
-  $('#journey').classList.remove('complete');$('#timer').classList.remove('paid');
-  $('#timer-v').innerHTML='–';$('#timer-s').textContent='';$('#now').innerHTML='';
-  $('#ph-ava').textContent='?';$('#ph-who').textContent='';[...$('#msgs').querySelectorAll('.m')].forEach(n=>n.remove());typing(false);
-  $('#flows-h').innerHTML='<h2>Completed today</h2><span class="meta"></span>';$('#flows').innerHTML='';
-  $('#wall-h').innerHTML='<h2>Just paid</h2><span class="meta">From Teams payment messages</span>';$('#wall').innerHTML='';
-}
-/* Goal view: today's real counts and amounts multiplied by GOAL_X to show the daily goal
-   (pace of 4,000 work orders a month). Cards are labeled as the goal; Today shows the real numbers. */
-const GOAL_X=5;
-let goalOn=true;try{goalOn=localStorage.getItem('goalView')!=='actual';}catch{}
-/* The row above the cards: Real data / Demo, plus Today / Goal when showing real data. */
-function renderGoalbar(){
-  const real=MODE==='real',goal=real&&REAL;
-  $('#goalbar').innerHTML=`<span class="gl">${!real?'Demo · simulated data':goal?(goalOn?'Daily goal':'Today so far, from ClickUp'):'Real data from ClickUp'}</span>
-    <div class="segs"><div class="seg" role="group" aria-label="Data"><button type="button" data-m="real" aria-pressed="${real}">Real data</button><button type="button" data-m="demo" aria-pressed="${!real}">Demo</button></div>${goal?`
-    <div class="seg" role="group" aria-label="Numbers"><button type="button" data-g="actual" aria-pressed="${!goalOn}">Today</button><button type="button" data-g="goal" aria-pressed="${goalOn}">Goal</button></div>`:''}</div>`;
-}
-$('#goalbar').addEventListener('click',e=>{
-  const m=e.target.closest('[data-m]');if(m){const v=m.dataset.m==='real'?'real':'demo';if(v!==MODE)setMode(v);return;}
-  const b=e.target.closest('[data-g]');if(!b)return;goalOn=b.dataset.g==='goal';try{localStorage.setItem('goalView',goalOn?'goal':'actual');}catch{}renderReal();});
-function realKpis(jobs){
-  const x=goalOn?GOAL_X:1,withCost=jobs.filter(j=>j.cost!=null),cost=sum(withCost,j=>j.cost);
-  return [[goalOn?'Work orders per day':'Work orders completed',fmtN(jobs.length*x),goalOn?'Target for a full day':''],
-    ['Jobs with technician paid','–',''],
-    ['Payments released','–',''],
-    ['Average technician cost',withCost.length?fmt$(cost/withCost.length):'–',withCost.length?`Per job · ${withCost.length} of ${jobs.length} jobs have a cost`:'No costs entered yet']]
-    .map(([l,v,s],n)=>`<div class="kpi${n===0?' hero':''}"><span class="lbl">${l}${goalOn&&n===0&&v!=='–'?' <span class="gx">Goal</span>':''}</span><span class="val num">${v}</span><span class="sub">${s}</span></div>`).join('');
-}
-function renderReal(){
-  if(!REAL||MODE!=='real')return;
-  $('#pause').hidden=true;
-  const jobs=REAL.jobs,j=jobs[realSel];
-  renderGoalbar();$('#today').innerHTML=realKpis(jobs);
-  const warn=REAL.warnings||[];
-  $('#notice').hidden=!warn.length;$('#notice').innerHTML=warn.map(w=>`<div>${ic('alert')}${esc(w)}</div>`).join('');
-  buildJourney();
-  document.querySelectorAll('.band').forEach((b,n)=>{b.classList.toggle('on',n===0);b.classList.remove('ok');});
-  $('#journey').classList.remove('complete');$('#timer').classList.remove('paid');
-  $('#ph-ava').textContent='?';$('#ph-who').textContent='Technician name comes from Teams';
-  [...$('#msgs').querySelectorAll('.m')].forEach(n=>n.remove());typing(false);
-  const note=document.createElement('div');note.className='m in';note.textContent='Texts to the technician will show here once the Teams payment messages are connected.';
-  $('#msgs').insertBefore(note,$('#typing'));
-  if(!j){
-    $('#wo-title').textContent='No work orders completed yet today';
-    $('#wo-meta').textContent='Waiting for the first ClickUp task to move to Done/Incurred.';
-    $('#timer-v').innerHTML='–';$('#timer-s').textContent='';$('#now').innerHTML='';
-    $('#next').disabled=true;
-  }else{
-    $('#next').disabled=jobs.length<2;
-    $('#wo-title').textContent=j.title;
-    $('#wo-meta').innerHTML=`<b>${esc(j.wo)}</b> · ${esc(j.trade||'Trade not set')} · ${esc(j.fm||'FM not set')} · ${j.tech?`<b>${esc(j.tech)}</b>`:'Technician <b>from Teams</b>'}`;
-    const st=$('#st-0');st.classList.add('done');st.querySelector('.when').textContent=tzTime(j.completedAt);
-    if(j.signoff){const s1=$('#st-1');s1.classList.add('done');s1.querySelector('.when').textContent=j.signoff.signedAt?tzTime(j.signoff.signedAt):'';}
-    if(j.photos){const s2=$('#st-2');s2.classList.add('done');s2.querySelector('.when').textContent=j.photosAt?tzTime(j.photosAt):'';}
-    $('#now').innerHTML=head('Field','Job completed on site',`${j.tech?esc(j.tech):'The technician'} finished the work at ${j.store?esc(j.store):'the site'} and checked out at ${tzTime(j.completedAt)}.`)+
-      (j.steps?.length?`<ul class="checks">${j.steps.map(w=>`<li class="on"><span class="cb">${ic('check')}</span>${esc(w)}</li>`).join('')}</ul>`:'')+
-      (j.signoff?`<div class="now-h next"><span class="d">Field</span><h3>Site manager sign-off</h3><p>From the sign-off sheet attached in ClickUp.</p></div>
-        <div class="sig"><div class="pad"><span class="x">×</span>${j.signoff.signature?`<span class="ink" role="img" aria-label="Site manager's signature" style="--sig:url('/api/signature?id=${encodeURIComponent(j.id)}')"></span>`:''}</div>
-        <div class="signed on"><b>Site manager</b>${j.signoff.signedAt?'Signed '+tzTime(j.signoff.signedAt):''}</div></div>`:'')+
-      (j.photos?`<div class="now-h next"><span class="d">Field</span><h3>After photos submitted</h3><p>From the work order's SharePoint folder.</p></div>
-        <div class="tiles">${Array.from({length:j.photos},(_,n)=>`<div class="tile on ok"><img class="ph" src="/api/photo?id=${encodeURIComponent(j.id)}&n=${n}" alt="After photo ${n+1}" loading="lazy"><b class="badge">${ic('check')}</b></div>`).join('')}</div>`:'')+
-      `<div class="prior">The next steps fill in from the Teams payment messages: technician name, amount and payment method when the payment is issued, then the time the technician is paid.${j.titleFromAi?'':' Title taken from the description (AI titles are off or still loading).'}</div>`;
-    realTimer();
-  }
-  $('#flows-h').innerHTML=`<h2>Completed today</h2><span class="meta">${fmtN(jobs.length)} work orders · select one to follow it</span>`;
-  $('#flows').innerHTML=jobs.length?jobs.map((x,n)=>`<li class="flow${n===realSel?' just':''}" data-n="${n}" role="button" tabindex="0" style="cursor:pointer">
-      <div class="who"><b>${esc(x.title)}</b><span>${esc(x.wo)} · ${esc(x.trade||'–')} · <span class="ty">${esc(x.fm||'–')}</span></span></div>
-      <div class="dots" aria-hidden="true">${STEPS.map((_,k)=>{const d=[1,!!x.signoff,!!x.photos],n=d.indexOf(false)<0?3:d.indexOf(false);return `<i class="${k<3&&d[k]?'d':k===n?'a':''}"></i>`;}).join('')}</div>
-      <div class="st">Completed ${tzTime(x.completedAt)}${x.cost!=null?' · '+fmt$(x.cost):''}</div></li>`).join('')
-    :'<li class="empty">Nothing has reached Done/Incurred today yet.</li>';
-  $('#wall-h').innerHTML='<h2>Just paid</h2><span class="meta">From Teams payment messages</span>';
-  $('#wall').innerHTML='<p class="empty" style="width:100%">Payments show here once the Teams payment messages are connected.</p>';
-}
-function realTimer(){
-  const j=REAL?.jobs[realSel];if(MODE!=='real'||!j)return;
-  $('#timer-lbl').textContent='Since job completed';
-  $('#timer-v').innerHTML=hm((Date.now()-j.completedAt)/60000);
-  $('#timer-s').textContent='Completed '+tzTime(j.completedAt);
-}
-function pickReal(n){realSel=n;renderReal();}
-$('#flows').addEventListener('click',e=>{const li=e.target.closest('li[data-n]');if(li&&MODE==='real')pickReal(+li.dataset.n);});
-$('#flows').addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const li=e.target.closest('li[data-n]');if(li&&MODE==='real'){e.preventDefault();pickReal(+li.dataset.n);}});
-setInterval(()=>{
-  if(!REAL&&!realNextAt)return;
-  if(!document.hidden&&Date.now()>=realNextAt)loadReal(false);
-  else if(view!=='analytics'&&MODE==='real'&&REAL&&!realBusy){const u=document.querySelector('#src .upd');if(u&&!realErr)u.textContent=`Updated ${tzTime(REAL.asOf)} · next in ${Math.max(0,Math.ceil((realNextAt-Date.now())/1000))}s`;}
-  realTimer();
-},1000);
-if(MODE==='real')renderUnavailable();else setMode('demo');setSrc();
-if(location.protocol.startsWith('http'))loadReal(false);
+/* ══════════════════ DEMO ONLY ══════════════════
+   The page always plays the modeled journey and analytics (the Real data mode was removed). */
+const MODE='demo';
+function setSrc(){const el=$('#src');if(el)el.innerHTML='<span class="sim-chip" title="Modeled data for demonstration">Simulated data</span>';}
+$('#goalbar').hidden=true;$('#an-bar').hidden=true;$('#hist-real').hidden=true;$('#hist-demo').hidden=false;
+renderFlows(-1);renderToday();newJourney();setSrc();
 if(['analytics','speed'].includes(location.hash.slice(1)))select('analytics');
 })();
 </script>
