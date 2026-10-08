@@ -364,7 +364,7 @@ async function build() {
         steps: ai?.steps?.length ? ai.steps : quoteSteps(quoteOf(t)),
         tech: shortName(teamsTech || fieldText(field(t, techField))),
         techFromTeams: !!teamsTech,
-        signoff: (({ result } = {}) => result && { manager: shortName(result.manager), signedAt: result.signedAt, signature: !!result.png })(signoffCache.get(t.id)),
+        signoff: (({ result } = {}) => result && { signedAt: result.signedAt, signature: !!result.png })(signoffCache.get(t.id)),
         trade: fieldText(field(t, names.trade)),
         fm: fieldText(field(t, names.fm)),
         cost: fieldNumber(field(t, names.cost)),

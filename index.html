@@ -952,7 +952,7 @@ function enterStep(i){
     `<ul class="checks">${J.job.work.map((w,k)=>`<li id="ck-${k}"><span class="cb">${ic('check')}</span>${w}</li>`).join('')}</ul>`+priorHTML();
   if(s.key==='sign')h=head('Field','Site manager sign-off','The customer confirms the work is done before anything moves.')+
     `<div class="sig"><div class="pad" id="pad"><span class="x">×</span><svg viewBox="0 0 240 80" preserveAspectRatio="xMidYMid meet"><path d="${SIG}" pathLength="1"/></svg></div>
-     <div class="signed" id="signed"><b>${J.signer[0]}</b>${J.signer[1]} · signed ${clockStr(t)}</div></div>`;
+     <div class="signed" id="signed"><b>${J.signer[1]}</b>Signed ${clockStr(t)}</div></div>`;
   if(s.key==='photos')h=head('Field','After photos submitted',`${J.first} uploads proof of the finished work from the job site.`)+tilesHTML();
   if(s.key==='review')h=head('Operations','Operations reviews the photos','Every photo is checked by a person before payment is released.')+tilesHTML()+
     `<div class="flagnote" id="flagnote">${ic('alert')}${J.job.photos[1]} photo is blurry. Retake requested from ${J.first}.</div>
@@ -981,7 +981,7 @@ function beats(i){
   if(k==='done'){[.12,.35,.58].forEach((a,n)=>b.push([a,()=>on('#ck-'+n)]));
     b.push([.5,()=>msg('in',`Thanks ${J.first}! ${J.wo} is marked complete. Next up: sign-off and after photos.`)]);}
   if(k==='sign'){b.push([.05,()=>$('#pad')&&$('#pad').classList.add('draw')]);b.push([.66,()=>on('#signed')]);
-    b.push([.8,()=>msg('in',`${J.signer[1]} ${J.signer[0]} signed off on your work.`)]);}
+    b.push([.8,()=>msg('in',`The ${J.signer[1].toLowerCase()} signed off on your work.`)]);}
   if(k==='photos'){[.1,.25,.4,.55].forEach((a,n)=>b.push([a,()=>on('#tile-'+n)]));
     b.push([.72,()=>msg('pics')]);}
   if(k==='review'){
@@ -1767,8 +1767,8 @@ function renderReal(){
     $('#now').innerHTML=head('Field','Job completed on site',`${j.tech?esc(j.tech):'The technician'} finished the work at ${j.store?esc(j.store):'the site'} and checked out at ${tzTime(j.completedAt)}.`)+
       (j.steps?.length?`<ul class="checks">${j.steps.map(w=>`<li class="on"><span class="cb">${ic('check')}</span>${esc(w)}</li>`).join('')}</ul>`:'')+
       (j.signoff?`<div class="now-h next"><span class="d">Field</span><h3>Site manager sign-off</h3><p>From the sign-off sheet attached in ClickUp.</p></div>
-        <div class="sig"><div class="pad"><span class="x">×</span>${j.signoff.signature?`<span class="ink" role="img" aria-label="Signature of ${esc(j.signoff.manager||'the site manager')}" style="--sig:url('/api/signature?id=${encodeURIComponent(j.id)}')"></span>`:''}</div>
-        <div class="signed on"><b>${esc(j.signoff.manager||'Site manager')}</b>Site manager${j.signoff.signedAt?' · signed '+tzTime(j.signoff.signedAt):''}</div></div>`:'')+
+        <div class="sig"><div class="pad"><span class="x">×</span>${j.signoff.signature?`<span class="ink" role="img" aria-label="Site manager's signature" style="--sig:url('/api/signature?id=${encodeURIComponent(j.id)}')"></span>`:''}</div>
+        <div class="signed on"><b>Site manager</b>${j.signoff.signedAt?'Signed '+tzTime(j.signoff.signedAt):''}</div></div>`:'')+
       `<div class="prior">The next steps fill in from the Teams payment messages: technician name, amount and payment method when the payment is issued, then the time the technician is paid.${j.titleFromAi?'':' Title taken from the description (AI titles are off or still loading).'}</div>`;
     realTimer();
   }
