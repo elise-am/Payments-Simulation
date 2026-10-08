@@ -165,6 +165,8 @@ svg.i{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .pad svg{position:absolute;inset:6px 16px 26px 30px;width:calc(100% - 46px);height:calc(100% - 32px);overflow:visible}
 .pad path{fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1}
 .pad.draw path{animation:sign 2.1s ease-in-out forwards}
+.now-h.next{margin-top:16px}
+.pad .ink{position:absolute;inset:8px 16px 32px 30px;background:var(--ink);-webkit-mask:var(--sig) center/contain no-repeat;mask:var(--sig) center/contain no-repeat}
 .signed{opacity:0;transition:opacity .4s;font-size:14px;color:var(--ink-2)}
 .signed.on{opacity:1}
 .signed b{color:var(--ink);display:block;font-size:16px}
@@ -1761,15 +1763,19 @@ function renderReal(){
     $('#wo-title').textContent=j.title;
     $('#wo-meta').innerHTML=`<b>${esc(j.wo)}</b> · ${esc(j.trade||'Trade not set')} · ${esc(j.fm||'FM not set')} · ${j.tech?`<b>${esc(j.tech)}</b>`:'Technician <b>from Teams</b>'}`;
     const st=$('#st-0');st.classList.add('done');st.querySelector('.when').textContent=tzTime(j.completedAt);
+    if(j.signoff){const s1=$('#st-1');s1.classList.add('done');s1.querySelector('.when').textContent=j.signoff.signedAt?tzTime(j.signoff.signedAt):'';}
     $('#now').innerHTML=head('Field','Job completed on site',`${j.tech?esc(j.tech):'The technician'} finished the work at ${j.store?esc(j.store):'the site'} and checked out at ${tzTime(j.completedAt)}.`)+
       (j.steps?.length?`<ul class="checks">${j.steps.map(w=>`<li class="on"><span class="cb">${ic('check')}</span>${esc(w)}</li>`).join('')}</ul>`:'')+
+      (j.signoff?`<div class="now-h next"><span class="d">Field</span><h3>Site manager sign-off</h3><p>From the sign-off sheet attached in ClickUp.</p></div>
+        <div class="sig"><div class="pad"><span class="x">×</span>${j.signoff.signature?`<span class="ink" role="img" aria-label="Signature of ${esc(j.signoff.manager||'the site manager')}" style="--sig:url('/api/signature?id=${encodeURIComponent(j.id)}')"></span>`:''}</div>
+        <div class="signed on"><b>${esc(j.signoff.manager||'Site manager')}</b>Site manager${j.signoff.signedAt?' · signed '+tzTime(j.signoff.signedAt):''}</div></div>`:'')+
       `<div class="prior">The next steps fill in from the Teams payment messages: technician name, amount and payment method when the payment is issued, then the time the technician is paid.${j.titleFromAi?'':' Title taken from the description (AI titles are off or still loading).'}</div>`;
     realTimer();
   }
   $('#flows-h').innerHTML=`<h2>Completed today</h2><span class="meta">${fmtN(jobs.length)} work orders · select one to follow it</span>`;
   $('#flows').innerHTML=jobs.length?jobs.map((x,n)=>`<li class="flow${n===realSel?' just':''}" data-n="${n}" role="button" tabindex="0" style="cursor:pointer">
       <div class="who"><b>${esc(x.title)}</b><span>${esc(x.wo)} · ${esc(x.trade||'–')} · <span class="ty">${esc(x.fm||'–')}</span></span></div>
-      <div class="dots" aria-hidden="true">${STEPS.map((_,k)=>`<i class="${k===0?'d':k===1?'a':''}"></i>`).join('')}</div>
+      <div class="dots" aria-hidden="true">${STEPS.map((_,k)=>{const n=x.signoff?2:1;return `<i class="${k<n?'d':k===n?'a':''}"></i>`;}).join('')}</div>
       <div class="st">Completed ${tzTime(x.completedAt)}${x.cost!=null?' · '+fmt$(x.cost):''}</div></li>`).join('')
     :'<li class="empty">Nothing has reached Done/Incurred today yet.</li>';
   $('#wall-h').innerHTML='<h2>Just paid</h2><span class="meta">From Teams payment messages</span>';
