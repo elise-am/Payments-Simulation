@@ -1759,9 +1759,10 @@ function renderReal(){
   }else{
     $('#next').disabled=jobs.length<2;
     $('#wo-title').textContent=j.title;
-    $('#wo-meta').innerHTML=`<b>${esc(j.wo)}</b> · ${esc(j.trade||'Trade not set')} · ${esc(j.fm||'FM not set')} · Technician <b>from Teams</b>`;
+    $('#wo-meta').innerHTML=`<b>${esc(j.wo)}</b> · ${esc(j.trade||'Trade not set')} · ${esc(j.fm||'FM not set')} · ${j.tech?`<b>${esc(j.tech)}</b>`:'Technician <b>from Teams</b>'}`;
     const st=$('#st-0');st.classList.add('done');st.querySelector('.when').textContent=tzTime(j.completedAt);
-    $('#now').innerHTML=head('Field','Job completed',`${esc(j.wo)} moved to ${esc(j.status)} in ClickUp at ${tzTime(j.completedAt)}.`)+
+    $('#now').innerHTML=head('Field','Job completed on site',`${j.tech?esc(j.tech):'The technician'} finished the work at ${j.store?esc(j.store):'the site'} and checked out at ${tzTime(j.completedAt)}.`)+
+      (j.steps?.length?`<ul class="checks">${j.steps.map(w=>`<li class="on"><span class="cb">${ic('check')}</span>${esc(w)}</li>`).join('')}</ul>`:'')+
       `<div class="prior">The next steps fill in from the Teams payment messages: technician name, amount and payment method when the payment is issued, then the time the technician is paid.${j.titleFromAi?'':' Title taken from the description (AI titles are off or still loading).'}</div>`;
     realTimer();
   }

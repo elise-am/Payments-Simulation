@@ -17,26 +17,32 @@
  *   CLICKUP_FIELD_FM     custom field holding the client / FM (default "FM")
  *   CLICKUP_FIELD_COST   custom field holding the cost (default "Cost")
  *   CLICKUP_FIELD_DESCRIPTION  field the job title is written from (default "WO Description", else the task description)
+ *   CLICKUP_FIELD_STORE  custom field holding the store / site name (default "Store")
+ *   CLICKUP_FIELD_QUOTE  custom field holding the client quote; its work list gives the 3 steps shown (default "Client Quote")
+ *   CLICKUP_FIELD_TECH   fallback for the technician's name until a Teams request names one (default "Tech Name")
  *   CLICKUP_FIELD_COMP   custom field naming the company a job belongs to (default "Comp")
  *   CLICKUP_COMP_VALUE   only jobs whose Comp is this value are shown (default "SFM")
  *   APP_TZ               time zone that defines "today" (default America/New_York)
- *   ANTHROPIC_API_KEY    optional; turns descriptions into short job titles
+ *   ANTHROPIC_API_KEY    optional; turns descriptions into short job titles and quotes into 3 steps
+ *   PAYMENTS_GRAPH_* + TEAMS_PAY_CHAT_ID  optional; the technician's name from the Teams payment request (lib/teams.js)
  *   DASHBOARD_PASSWORD   required before any real data is served (see middleware.js)
  *
  * ?refresh=1 skips the 45-second cache (the page's Refresh button sends it).
  */
 import Anthropic from "@anthropic-ai/sdk";
+import { TEAMS_SETTINGS, chatMessagesSince, paymentRequests } from "../lib/teams.js";
 
 const API = "https://api.clickup.com/api/v2";
 const env = (k, d = "") => (process.env[k] ?? d).trim();
 const list = (k) => env(k).split(",").map((s) => s.trim()).filter(Boolean);
+const woKey = (s) => String(s ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 const letters = (s) => String(s ?? "").toLowerCase().replace(/[^a-z]/g, "");
 
 // Warm-instance caches. A cold start rebuilds them; nothing here is a source of truth.
 let lastResult = null;
 let lastAt = 0;
 const doneAtCache = new Map(); // task id → ms the task entered its done status
-const titleCache = new Map(); // task id + description hash → short title
+const titleCache = new Map(); // task id + description/quote hash → { title, steps }
 let aiError = ""; // last AI title failure, reported in warnings
 
 async function cuGet(path) {
@@ -162,13 +168,40 @@ function firstSentence(text) {
   return s.length > 70 ? s.slice(0, 67).replace(/\s+\S*$/, "") + "…" : s;
 }
 
+/** The quote's work list only: prices and the "Incurred" totals are cut before it is shown or sent anywhere. */
+function safeQuote(text) {
+  return safeDescription(String(text ?? "").split(/^\s*(?:incurred|total)\b/im)[0])
+    .split("\n")
+    .filter((l) => !/\$\s*\d/.test(l))
+    .join("\n")
+    .trim();
+}
+
+/** Without AI: the work list's lines (after "Required is to"), repair and install steps first, in quote order. */
+function quoteSteps(quote) {
+  const lines = quote.split("\n").map((l) => l.replace(/^[\s•*\-–\d.)]+/, "").trim()).filter((l) => l.length > 3 && l.length < 90);
+  const at = lines.findIndex((l) => /^required\b/i.test(l));
+  const work = (at >= 0 ? lines.slice(at + 1) : lines.slice(1)).filter((l) => !/:$/.test(l));
+  const main = work.filter((l) => /^(supply and )?(install|replac|repair|rebuil|reseal|swap|fix)/i.test(l));
+  const tests = work.filter((l) => /^(test|verify)/i.test(l));
+  const pick = new Set([...main, ...tests, ...work].slice(0, 3));
+  return work.filter((l) => pick.has(l));
+}
+
+/** "Tyler Morgan" → "Tyler M." */
+const shortName = (s) => {
+  const w = String(s ?? "").trim().split(/\s+/).filter(Boolean);
+  const cap = (x) => x[0].toUpperCase() + x.slice(1);
+  return w.length > 1 ? `${cap(w[0])} ${w[w.length - 1][0].toUpperCase()}.` : w[0] ? cap(w[0]) : "";
+};
+
 const hash = (s) => {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
   return (h >>> 0).toString(36);
 };
 
-/** Short job titles from work-order descriptions, in one request per batch of 25. */
+/** Short job titles from work-order descriptions, and the 3 main steps from each client quote, in one request per batch of 25. */
 async function aiTitles(items) {
   const out = new Map();
   if (!env("ANTHROPIC_API_KEY") || !items.length) return out;
@@ -185,19 +218,20 @@ async function aiTitles(items) {
             type: "json_schema",
             schema: {
               type: "object",
-              properties: { titles: { type: "array", items: { type: "object", properties: { id: { type: "string" }, title: { type: "string" } }, required: ["id", "title"], additionalProperties: false } } },
+              properties: { titles: { type: "array", items: { type: "object", properties: { id: { type: "string" }, title: { type: "string" }, steps: { type: "array", items: { type: "string" } } }, required: ["id", "title", "steps"], additionalProperties: false } } },
               required: ["titles"],
               additionalProperties: false,
             },
           },
         },
         system:
-          "You write job titles for a facilities-maintenance payments dashboard. For each work order, read the description and write what was wrong, in plain words, as a short title of 3 to 7 words, sentence case, no period. Name the equipment and the problem (for example: Rooftop unit not cooling, Leak under the prep sink, Walk-in cooler holding at 48°F). Leave out client names, store numbers, addresses, people, prices and work-order numbers. If a description is empty or says nothing about the problem, return an empty title.",
-        messages: [{ role: "user", content: JSON.stringify(batch.map((b) => ({ id: b.id, description: b.description }))) }],
+          "You write job titles for a facilities-maintenance payments dashboard. For each work order, read the description and write what was wrong, in plain words, as a short title of 3 to 7 words, sentence case, no period. Name the equipment and the problem (for example: Rooftop unit not cooling, Leak under the prep sink, Walk-in cooler holding at 48°F). Leave out client names, store numbers, addresses, people, prices and work-order numbers. If a description is empty or says nothing about the problem, return an empty title. " +
+          "Each work order may also have a quote listing the work to be done. From it, pick the 3 main steps that fixed the problem (the repair or replacement itself, the test that proves it works, then the next most important), skipping routine ones like inspecting, shutting off water or power, or cleaning up. Write each as a finished result in past tense, 3 to 7 words, sentence case, no period (for example: Failed contactor replaced, Supply air back down to 41°F, Filters replaced on both units). Leave out prices. With no quote or no work list, return an empty steps array.",
+        messages: [{ role: "user", content: JSON.stringify(batch.map((b) => ({ id: b.id, description: b.description, quote: b.quote }))) }],
       });
       if (response.stop_reason === "refusal") continue;
       const text = response.content.filter((b) => b.type === "text").map((b) => b.text).join("");
-      for (const t of JSON.parse(text).titles ?? []) if (t.title) out.set(t.id, t.title.trim());
+      for (const t of JSON.parse(text).titles ?? []) out.set(t.id, { title: (t.title ?? "").trim(), steps: (t.steps ?? []).map((x) => String(x).trim()).filter(Boolean).slice(0, 3) });
     } catch (err) {
       if (err instanceof Anthropic.RateLimitError) aiError = "AI titles: rate limited";
       else if (err instanceof Anthropic.APIError) aiError = `AI titles: API error ${err.status}: ${String(err.message).slice(0, 200)}`;
@@ -212,7 +246,8 @@ async function build() {
   const tz = env("APP_TZ", "America/New_York");
   const since = startOfToday(tz);
   const doneStatus = letters(env("CLICKUP_DONE_STATUS", "done/incurred"));
-  const names = { trade: env("CLICKUP_FIELD_TRADE", "Trade"), fm: env("CLICKUP_FIELD_FM", "FM"), cost: env("CLICKUP_FIELD_COST", "Cost"), desc: env("CLICKUP_FIELD_DESCRIPTION", "WO Description") };
+  const names = { trade: env("CLICKUP_FIELD_TRADE", "Trade"), fm: env("CLICKUP_FIELD_FM", "FM"), cost: env("CLICKUP_FIELD_COST", "Cost"), desc: env("CLICKUP_FIELD_DESCRIPTION", "WO Description"), store: env("CLICKUP_FIELD_STORE", "Store"), quote: env("CLICKUP_FIELD_QUOTE", "Client Quote") };
+  const techField = env("CLICKUP_FIELD_TECH", "Tech Name");
 
   const updated = await allTasksUpdatedSince(since);
   // Only this company's jobs (Comp = SFM), checked before the per-task completion-time calls.
@@ -230,10 +265,23 @@ async function build() {
   }
   const today = withTimes.filter(([, ms]) => ms >= since);
 
-  // Titles: cached per description; new ones go to Claude in one batch.
+  // Technician names from today's Teams payment requests, by work order (latest request wins).
+  const techByWo = new Map();
+  let teamsError = "";
+  if (TEAMS_SETTINGS.every((k) => env(k)) && today.length) {
+    try {
+      const reqs = paymentRequests(await chatMessagesSince(since)).sort((a, b) => a.requestedAt - b.requestedAt);
+      for (const r of reqs) if (r.technicianName) techByWo.set(woKey(r.workOrderNumber), r.technicianName);
+    } catch (err) {
+      teamsError = "Teams names unavailable: " + String(err?.message ?? err).slice(0, 200);
+    }
+  }
+
+  // Titles and steps: cached per description + quote; new ones go to Claude in one batch.
   const descOf = (t) => safeDescription(fieldText(field(t, names.desc)) || t.text_content || t.description || "").slice(0, 6000); // titles only need the opening of long descriptions
-  const keyOf = (t) => t.id + ":" + hash(descOf(t));
-  const missing = today.filter(([t]) => !titleCache.has(keyOf(t)) && descOf(t)).map(([t]) => ({ id: t.id, description: descOf(t) }));
+  const quoteOf = (t) => safeQuote(fieldText(field(t, names.quote))).slice(0, 4000);
+  const keyOf = (t) => t.id + ":" + hash(descOf(t) + "\u0000" + quoteOf(t));
+  const missing = today.filter(([t]) => !titleCache.has(keyOf(t)) && (descOf(t) || quoteOf(t))).map(([t]) => ({ id: t.id, description: descOf(t), quote: quoteOf(t) }));
   const fresh = await aiTitles(missing);
   if (fresh.size) aiError = "";
   for (const [t] of today) {
@@ -245,12 +293,17 @@ async function build() {
   const jobs = today
     .map(([t, ms]) => {
       for (const f of t.custom_fields ?? []) seen.add(f.name);
-      const k = keyOf(t);
+      const k = keyOf(t), ai = titleCache.get(k);
+      const teamsTech = techByWo.get(woKey(t.name));
       return {
         id: t.id,
         wo: t.name,
-        title: titleCache.get(k) || firstSentence(descOf(t)) || (fieldText(field(t, names.trade)) ? fieldText(field(t, names.trade)) + " job" : "Work order"),
-        titleFromAi: titleCache.has(k),
+        title: ai?.title || firstSentence(descOf(t)) || (fieldText(field(t, names.trade)) ? fieldText(field(t, names.trade)) + " job" : "Work order"),
+        titleFromAi: !!ai?.title,
+        store: fieldText(field(t, names.store)),
+        steps: ai?.steps?.length ? ai.steps : quoteSteps(quoteOf(t)),
+        tech: shortName(teamsTech || fieldText(field(t, techField))),
+        techFromTeams: !!teamsTech,
         trade: fieldText(field(t, names.trade)),
         fm: fieldText(field(t, names.fm)),
         cost: fieldNumber(field(t, names.cost)),
@@ -266,6 +319,7 @@ async function build() {
   for (const [k, n] of Object.entries(names)) if (jobs.length && !jobs.some((j) => j[k] !== "" && j[k] !== null)) warnings.push(`No value found in the "${n}" field on any of today's tasks`);
   if (doneAny.length && !doneAny.some((t) => field(t, compField))) warnings.push(`No "${compField}" field found on today's completed tasks, so none are shown`);
   if (aiError) warnings.push(aiError);
+  if (teamsError) warnings.push(teamsError);
   if (!env("ANTHROPIC_API_KEY")) warnings.push("ANTHROPIC_API_KEY is not set, so titles use the first sentence of the description");
 
   const statusesSeen = [...new Set(updated.map((t) => t.status?.status).filter(Boolean))].sort();
