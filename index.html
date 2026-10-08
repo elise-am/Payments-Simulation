@@ -171,7 +171,7 @@ svg.i{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .signed.on{opacity:1}
 .signed b{color:var(--ink);display:block;font-size:16px}
 
-.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;max-width:560px}
+.tiles{display:grid;grid-template-columns:minmax(0,320px);gap:10px}
 .tile{position:relative;aspect-ratio:4/3;max-width:100%;border-radius:6px;overflow:hidden;color:#fff;display:flex;align-items:flex-end;padding:8px;font-size:12px;font-weight:600;opacity:0;transform:scale(.85);transition:opacity .3s,transform .35s cubic-bezier(.3,1.5,.5,1)}
 .tile.on{opacity:1;transform:none}
 .tile .ph{position:absolute;inset:0}
@@ -237,8 +237,8 @@ img.ph{width:100%;height:100%;object-fit:cover;background:var(--surface-2)}
 .m{max-width:84%;padding:8px 11px;border-radius:16px;font-size:13px;line-height:1.35}
 .m.in{align-self:flex-start;background:var(--surface-2);border:1px solid var(--border);border-bottom-left-radius:5px}
 .m.out{align-self:flex-end;background:var(--accent-fill);color:var(--on-accent);border-bottom-right-radius:5px}
-.m.pics{display:grid;grid-template-columns:repeat(2,40px);gap:4px;padding:5px}
-.m.pics div{width:40px;height:30px;border-radius:4px}
+.m.pics{padding:5px}
+.m.pics div{width:120px;height:90px;border-radius:6px}
 .m.dep{align-self:stretch;max-width:100%;border-radius:12px;background:var(--good-soft);border:1.5px solid var(--good-fill);padding:12px}
 .m.dep .k{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--good)}
 .m.dep .a{font-family:var(--font-num);font-weight:800;font-size:34px;line-height:1.1;color:var(--ink)}
@@ -377,7 +377,6 @@ th.r,td.r{text-align:right;font-variant-numeric:tabular-nums}
   .ctl{justify-content:flex-start}
   .wo,.journey{padding-inline:16px}
   .now{margin-inline:12px;padding:16px}
-  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
   .flow{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
   .flow .st{grid-column:1 / -1}
   .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -920,7 +919,8 @@ function pickPics(trade,store){const r=mulberry32(5003+jCount*7919);
   let pool=PICS.filter(p=>p[2].includes(trade));
   if(pool.length<2)pool=pool.concat(PICS.filter(p=>p[2].includes('Handyman')&&!pool.includes(p)));
   for(let i=pool.length-1;i>0;i--){const k=Math.floor(r()*(i+1));[pool[i],pool[k]]=[pool[k],pool[i]];}
-  const lead=/wendy/i.test(store||'')?WENDYS_PICS:[];return lead.concat(pool).slice(0,4);}
+  // one photo per work order; a Wendy's job always shows one of its own
+  return [/wendy/i.test(store||'')?WENDYS_PICS[Math.floor(r()*WENDYS_PICS.length)]:pool[0]];}
 const picURL=f=>'photos/'+f+'.jpg';
 const SIG='M4 58 C 16 18, 34 12, 30 52 S 40 70, 52 40 S 66 18, 70 46 S 80 66, 92 38 C 100 22, 112 26, 106 50 S 122 64, 134 36 S 150 30, 156 48 S 170 58, 186 34 C 194 24, 204 30, 200 46 M 120 70 C 150 62, 190 60, 236 62';
 
@@ -995,10 +995,10 @@ function enterStep(i){
   if(s.key==='sign')h=head('Field','Site manager sign-off','The customer confirms the work is done before anything moves.')+
     `<div class="sig"><div class="pad" id="pad"><span class="x">×</span><svg viewBox="0 0 240 80" preserveAspectRatio="xMidYMid meet"><path d="${SIG}" pathLength="1"/></svg></div>
      <div class="signed" id="signed"><b>${J.signer[1]}</b>Signed ${clockStr(t)}</div></div>`;
-  if(s.key==='photos')h=head('Field','After photos submitted','')+tilesHTML();
-  if(s.key==='review')h=head('Operations','Operations reviews the photos','Every photo is checked by a person before payment is released.')+tilesHTML()+
+  if(s.key==='photos')h=head('Field','After photo submitted','')+tilesHTML();
+  if(s.key==='review')h=head('Operations','Operations reviews the photo','Every photo is checked by a person before payment is released.')+tilesHTML()+
     `<div class="flagnote" id="flagnote">${ic('alert')}${J.job.photos[1]} photo is blurry. Retake requested from ${J.first}.</div>
-     <div class="reviewer">Reviewed by <b>${J.ops}</b>, Operations · Invoice cost checked against the quote</div><div class="allok" id="allok">${ic('check')}All photos approved</div>`;
+     <div class="reviewer">Reviewed by <b>${J.ops}</b>, Operations · Invoice cost checked against the quote</div><div class="allok" id="allok">${ic('check')}Photo approved</div>`;
   if(s.key==='trigger')h=head('Operations','Operations triggers the payment','All checks passed. One click hands the payment to Accounts Payable.')+
     `<div class="release"><div class="rbtn" id="rbtn">${ic('send')}<span id="rbtn-t">Release ${usd2.format(J.amount)}</span></div>
      <div class="handoff" id="handoff">Operations<span class="arrow"><i></i></span>Accounts Payable</div></div>`;
@@ -1024,20 +1024,18 @@ function beats(i){
     b.push([.5,()=>msg('in',`Thanks ${J.first}! ${J.wo} is marked complete. Next up: sign-off and after photos.`)]);}
   if(k==='sign'){b.push([.05,()=>$('#pad')&&$('#pad').classList.add('draw')]);b.push([.66,()=>on('#signed')]);
     b.push([.8,()=>msg('in',`The ${J.signer[1].toLowerCase()} signed off on your work.`)]);}
-  if(k==='photos'){[.1,.25,.4,.55].forEach((a,n)=>b.push([a,()=>on('#tile-'+n)]));
+  if(k==='photos'){b.push([.25,()=>on('#tile-0')]);
     b.push([.72,()=>msg('pics')]);}
   if(k==='review'){
     if(J.hiccup){
-      b.push([.1,()=>ok(0)]);
-      b.push([.2,()=>{const t=$('#tile-1');if(t){t.classList.add('bad','blur');t.querySelector('.badge').innerHTML=ic('alert');}on('#flagnote');$('#st-3').classList.add('hold');}]);
-      b.push([.27,()=>msg('in',`Quick fix: the ${J.job.photos[1].toLowerCase()} photo is blurry. Can you retake it?`)]);
+      b.push([.2,()=>{const t=$('#tile-0');if(t){t.classList.add('bad','blur');t.querySelector('.badge').innerHTML=ic('alert');}on('#flagnote');$('#st-3').classList.add('hold');}]);
+      b.push([.27,()=>msg('in',`Quick fix: the ${J.job.photos[0].toLowerCase()} photo is blurry. Can you retake it?`)]);
       b.push([.42,()=>msg('out','On it, sending now.')]);
       b.push([.5,()=>msg('pics1')]);
-      b.push([.58,()=>{const t=$('#tile-1');if(t){t.classList.remove('bad','blur');t.querySelector('.badge').innerHTML=ic('check');t.classList.add('ok');}const f=$('#flagnote');if(f)f.classList.remove('on');$('#st-3').classList.remove('hold');}]);
-      b.push([.68,()=>ok(2)]);b.push([.78,()=>ok(3)]);
-    }else{[.15,.32,.49,.66].forEach((a,n)=>b.push([a,()=>ok(n)]));}
+      b.push([.58,()=>{const t=$('#tile-0');if(t){t.classList.remove('bad','blur');t.querySelector('.badge').innerHTML=ic('check');t.classList.add('ok');}const f=$('#flagnote');if(f)f.classList.remove('on');$('#st-3').classList.remove('hold');}]);
+    }else{b.push([.4,()=>ok(0)]);}
     b.push([.82,()=>on('#allok')]);
-    b.push([.9,()=>msg('in','Photos approved. Your payment is being released.')]);}
+    b.push([.9,()=>msg('in','Photo approved. Your payment is being released.')]);}
   if(k==='trigger'){b.push([.3,()=>{const r=$('#rbtn');if(r)r.classList.add('press');}]);
     b.push([.38,()=>{const r=$('#rbtn');if(r){r.classList.remove('press');r.classList.add('done');$('#rbtn-t').textContent='Released to Accounts Payable';}on('#handoff');}]);}
   if(k==='ap'){b.push([.62,()=>on('#stamp')]);b.push([.78,()=>msg('in',`Payment of ${usd2.format(J.amount)} has been issued to you.`)]);}
@@ -1055,7 +1053,7 @@ function msg(kind,text){
   const box=$('#msgs'),d=document.createElement('div');
   if(kind==='in'||kind==='out'){d.className='m enter '+kind;d.textContent=text;}
   if(kind==='pics'||kind==='pics1'){d.className='m out pics enter';const n=kind==='pics'?J.job.pics.length:1;
-    d.innerHTML=Array.from({length:n},(_,i)=>`<div style="background:#333 url(${picURL(J.job.pics[kind==='pics'?i:1])}) center/cover"></div>`).join('');}
+    d.innerHTML=Array.from({length:n},(_,i)=>`<div style="background:#333 url(${picURL(J.job.pics[0])}) center/cover"></div>`).join('');}
   if(kind==='dep'){const n=J.types.length;d.className='m dep enter';d.innerHTML=`<div class="k">Deposit received</div><div class="a">${usd2.format(J.amount)}</div><div class="f">From Seamless FM · ${J.wo} · Payment ${n} of ${n} · ACH / Bank Transfer</div>`;}
   box.insertBefore(d,$('#typing'));
   const all=box.querySelectorAll('.m');if(all.length>7)all[0].remove();
