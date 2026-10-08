@@ -1260,17 +1260,17 @@ function renderPS(){
   const notes=[...(MODE==='real'&&psErr?[psErr]:[]),...(D?.warnings||[])];
   $('#ps-notice').hidden=!notes.length;$('#ps-notice').innerHTML=notes.map(t=>`<div>${ic('alert')}${esc(t)}</div>`).join('');
   if(!D){
-    $('#ps-range').textContent='Today · SFM';
+    $('#ps-range').textContent='Today';
     $('#ps-headline').textContent=MODE==='real'&&psErr?'Real pay speed is not available right now.':'Loading today\'s payments…';
     ['#ps-pipe','#ps-kpis','#ps-gantt'].forEach(s=>$(s).innerHTML='');['ps-od'].forEach(P=>{$(`#${P}-table`).innerHTML='';$(`#${P}-n`).textContent='–';$(`#${P}-n`).classList.remove('on');$(`#${P}-sum`).hidden=true;});psOverdue();$('#ps-count').textContent='';
     return;
   }
   const S=D.summary,now=D.asOf,T=S.completeToPaid,Q=S.requestToPaid,teams=D.teamsConnected;
-  $('#ps-range').textContent=D.demo?`Today since ${clk(D.since)} · Demo · simulated jobs`:`Today since ${clk(D.since)} · SFM · ClickUp${teams?' and Teams':''}`;
-  $('#ps-headline').innerHTML=!teams?`<em>${fmtN(S.completed)}</em> SFM job${S.completed===1?'':'s'} completed today. Payment times appear once Teams is connected.`
+  $('#ps-range').textContent=D.demo?`Today since ${clk(D.since)} · Demo · simulated jobs`:`Today since ${clk(D.since)} · ClickUp${teams?' and Teams':''}`;
+  $('#ps-headline').innerHTML=!teams?`<em>${fmtN(S.completed)}</em> job${S.completed===1?'':'s'} completed today. Payment times appear once Teams is connected.`
     :T.n?`Today, technicians are paid within <em>${dur(T.median)}</em> after the job is completed.`
     :Q.n?`Today, payment requests are paid within <em>${dur(Q.median)}</em> after they are sent.`
-    :'No SFM payments yet today.';
+    :'No payments yet today.';
 
   // the three steps, with the time between them
   const hot=ms=>ms!=null&&ms>3600000;
