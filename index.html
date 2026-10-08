@@ -553,7 +553,7 @@ body[data-view="analytics"] .bar>.src{display:none}
       <div class="cal" aria-hidden="true"><span class="mo" id="d-mo"></span><span class="dy num" id="d-dy"></span></div>
       <div class="dt"><b id="d-full"></b><span><span class="live-dot" aria-hidden="true"></span><span id="d-clk"></span></span></div>
     </div>
-    <div class="src" id="src"><span class="sim-chip" title="Modeled data for demonstration">Simulated data</span></div>
+    <div class="src" id="src"></div>
     <a class="btn signout" id="signout" href="/logout" hidden>Sign out</a>
   </header>
 
@@ -1259,7 +1259,7 @@ function psSummary(rows,since,now){
     completeToPaid:psStats(pay.filter(r=>r.processedAt&&r.completedAt).map(r=>r.processedAt-r.completedAt))};
 }
 function psUpd(){const secs=Math.max(0,Math.ceil((psNextAt-Date.now())/1000));return psBusy?'Refreshing…':PS?`Updated ${clk(PS.asOf)} · next in ${secs}s`:(psErr?'':'Connecting…');}
-function psStatus(){if(MODE!=='real'){$('#ps-status').innerHTML='<span class="sim-chip" title="Modeled data for demonstration">Simulated data</span>';return;}$('#ps-status').innerHTML=`<span class="upd">${psUpd()}</span><button type="button" class="btn" id="ps-refresh"${psBusy?' disabled':''}>Refresh</button>`;}
+function psStatus(){if(MODE!=='real'){$('#ps-status').innerHTML='';return;}$('#ps-status').innerHTML=`<span class="upd">${psUpd()}</span><button type="button" class="btn" id="ps-refresh"${psBusy?' disabled':''}>Refresh</button>`;}
 $('#ps-status').addEventListener('click',e=>{if(e.target.closest('#ps-refresh'))loadPS(true);});
 setInterval(()=>{
   if(view!=='analytics'||document.hidden||psBusy)return;
@@ -1659,7 +1659,7 @@ let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>
 /* ══════════════════ DEMO ONLY ══════════════════
    The page always plays the modeled journey and analytics (the Real data mode was removed). */
 const MODE='demo';
-function setSrc(){const el=$('#src');if(el)el.innerHTML='<span class="sim-chip" title="Modeled data for demonstration">Simulated data</span>';}
+function setSrc(){const el=$('#src');if(el)el.innerHTML='';}
 $('#goalbar').hidden=true;$('#an-bar').hidden=true;$('#hist-real').hidden=true;$('#hist-demo').hidden=false;
 renderFlows(-1);renderToday();newJourney();setSrc();
 if(['analytics','speed'].includes(location.hash.slice(1)))select('analytics');
