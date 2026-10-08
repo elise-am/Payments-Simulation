@@ -938,7 +938,7 @@ function buildJourney(){
   $('#journey').style.setProperty('--p',0);
 }
 
-function head(dept,title,sub){return `<div class="now-h"><span class="d">${dept}</span><h3>${title}</h3><p>${sub}</p></div>`;}
+function head(dept,title,sub){return `<div class="now-h"><span class="d">${dept}</span><h3>${title}</h3>${sub?`<p>${sub}</p>`:''}</div>`;}
 function tilesHTML(){return `<div class="tiles">${J.job.photos.map((p,i)=>`<div class="tile" id="tile-${i}"><div class="ph" style="background:${PHOTO_BG[i]}"></div><svg class="i cam"><use href="#i-camera"/></svg><span>${p}</span><b class="badge">${ic('check')}</b></div>`).join('')}</div>`;}
 function on(sel){const n=$(sel);if(n)n.classList.add('on');}
 function priorHTML(){
@@ -954,7 +954,7 @@ function enterStep(i){
   if(s.key==='sign')h=head('Field','Site manager sign-off','The customer confirms the work is done before anything moves.')+
     `<div class="sig"><div class="pad" id="pad"><span class="x">×</span><svg viewBox="0 0 240 80" preserveAspectRatio="xMidYMid meet"><path d="${SIG}" pathLength="1"/></svg></div>
      <div class="signed" id="signed"><b>${J.signer[1]}</b>Signed ${clockStr(t)}</div></div>`;
-  if(s.key==='photos')h=head('Field','After photos submitted',`${J.first} uploads proof of the finished work from the job site.`)+tilesHTML();
+  if(s.key==='photos')h=head('Field','After photos submitted','')+tilesHTML();
   if(s.key==='review')h=head('Operations','Operations reviews the photos','Every photo is checked by a person before payment is released.')+tilesHTML()+
     `<div class="flagnote" id="flagnote">${ic('alert')}${J.job.photos[1]} photo is blurry. Retake requested from ${J.first}.</div>
      <div class="reviewer">Reviewed by <b>${J.ops}</b>, Operations · Invoice cost checked against the quote</div><div class="allok" id="allok">${ic('check')}All photos approved</div>`;
